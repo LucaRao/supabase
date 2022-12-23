@@ -1,0 +1,91 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'sequin',
+  title: 'Sequin',
+  description:
+    '使用Sequin将Stripe和Salesforce等平台与你的Supabase数据库进行实时同步。',
+}
+
+本指南解释了如何快速设置Sequin和Supabase Postgres数据库之间的同步。
+
+[Sequin](https://sequin.io)允许你将Stripe和Salesforce等平台与Supabase进行实时同步。你将能够使用SQL从Supabase客户端读取和写入你的[Stripe](https://stripe.com/)客户或[Salesforce](https://www.salesforce.com/)账户。下面是如何设置的。
+
+## 第1步：连接Sequin和Supabase
+
+要将Supabase连接到Sequin，你首先需要检索Supabase Postgres数据库的凭证。
+
+1. 在Supabase的仪表板上，进入设置页面，打开你的**数据库**设置。在**连接信息**部分，你会发现你需要的凭证--如 "主机 "和 "用户"。
+
+   ![TBD](/docs/img/guides/integrations/sequin/001_supabase_dash.png)
+
+2. 在[Sequin控制台]（https://app.sequin.io）中，进入你的同步配置，打开**目的地**部分。选择**启动或连接**，然后点击**连接**，配置与Supabase Postgres的连接。
+
+   ![TBD](/docs/img/guides/integrations/sequin/002_connect.png)
+
+3. 在出现的连接模式中，输入Supabase数据库的 `主机`和 `端口`，然后单击**继续**。
+
+   ![TBD](/docs/img/guides/integrations/sequin/003_step_1.png)
+
+4. 现在，输入 `数据库名称`并为同步设置 `模式`名称。例如，如果你同步Stripe，你可能想把你的同步模式命名为`stripe`之类的。最后，为你的Supabase数据库输入`用户`和`密码`，然后点击**继续**。Sequin将验证它能以正确的权限正确连接到你的数据库。
+
+   ![TBD](/docs/img/guides/integrations/sequin/004_step_2.png)
+
+5. Sequin现在已经连接到你的Supabase Postgres数据库，并将要求你确认哪些数据库用户应该能够访问你的同步模式。选择所有的用户并单击**继续**。
+
+   ![TBD](/docs/img/guides/integrations/sequin/005_step_3.png)
+
+6. Sequin现在将在你的Supabase数据库中创建一个新的模式和权限组。将Sequin中的数据库连接命名为 `Supabase`，你就完成了!
+
+在Supabase仪表板中，你可以进入**表编辑器**，你会看到一个新的模式，里面充满了你同步的平台数据。
+
+![TBD](/docs/img/guides/integrations/sequin/006_see_data.png)
+
+## 第2步：授予权限
+
+为了确保正确的用户可以访问Sequin管理的同步模式，你需要运行几个权限授予。
+
+1. 在Sequin控制台，点击同步旁边的**连接**按钮，复制下你的 `模式`和独特的 `阅读组`。
+
+   ![TBD](/docs/img/guides/integrations/sequin/007_get_read.png)
+
+2. 现在，在Supabase仪表板上，进入**SQL编辑器**，运行以下权限授予。
+
+   ```sql
+   GRANT sequin_read_▒▒▒▒ TO postgres, anon, authenticated, service_role;
+
+   GRANT USAGE ON SCHEMA {{your_schema_name}} TO anon, authenticated, service_role;
+
+   GRANT ALL ON ALL TABLES IN SCHEMA {{your_schema_name}} TO anon, authenticated, service_role;
+
+   ALTER DEFAULT PRIVILEGES FOR ROLE postgres, supabase_admin IN SCHEMA {{your_schema_name}} GRANT ALL ON TABLES TO anon, authenticated, service_role;
+   ```
+
+   这些权限授予确保各种 Supabase 数据库用户能够访问和读取同步模式中的所有表。
+
+## 第三步：配置Supabase客户端
+
+最后，你需要在你的应用程序中定义一个新的 [Supabase 客户端](/docs/reference/javascript/initializing#api-schemas) 来访问你的同步模式。在你初始化Supabase客户端的文件中，定义一个带有`schema`参数的新客户端。
+
+```javascript
+export const supabase_schema = createClient(
+  'https://xyzcompany.supabase.co',
+  'public-anon-key',
+  {
+    schema: {{your_schema_name}},
+  }
+);
+```
+
+你将使用这个客户端来查询你同步模式中的数据。
+
+## 资源
+
+- [Sequin](https://sequin.io*) 官方网站。
+- [Sequin Console](https://app.sequin.io*)。
+- [Sequin](https://docs.sequin.io/welcome) 文档。
+- [Sequin + Supabase + Stripe教程](https://github.com/sequin-io/build-a-saas-with-next-js-supabase-stripe-and-sequin)
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

@@ -1,0 +1,93 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'firebase-auth',
+  title: 'Firebase Auth 迁移',
+  description: '将Firebase auth用户迁移到Supabase项目中。',
+  sidebar_label: 'Firebase Auth',
+}
+
+Supabase 提供了几个[工具](https://github.com/supabase-community/firebase-to-supabase/tree/main/auth)来帮助将 auth 用户从 Firebase 项目迁移到 Supabase 项目。迁移过程有两个部分。
+
+- `firestoreusers2json` ([TypeScript](https://github.com/supabase-community/firebase-to-supabase/blob/main/auth/firestoreusers2json.ts), [JavaScript](https://github.com/supabase-community/firebase-to-supabase/blob/main/auth/firestoreusers2json.js)) 将现有Firebase项目中的用户导出到本地系统中的`.json`文件。
+- `import_users` ([TypeScript](https://github.com/supabase-community/firebase-to-supabase/blob/main/auth/import_users.ts), [JavaScript](https://github.com/supabase-community/firebase-to-supabase/blob/main/auth/import_users.js)) 从保存的`.json`文件中导入用户到你的Supabase项目（将这些用户插入到你的`PostgreSQL`数据库实例的`auth.users`表中）。
+
+## 设置迁移工具 {#set-up-migration-tool} 1.
+
+1. 克隆 [firebase-to-supabase](https://github.com/supabase-community/firebase-to-supabase) 存储库。
+
+```bash
+git clone https://github.com/supabase-community/firebase-to-supabase.git
+```
+
+1. 在`/auth`目录下，创建一个名为`supabase-service.json`的文件，内容如下。
+
+```json
+{
+  "host": "database.server.com",
+  "password": "secretpassword",
+  "user": "postgres",
+  "database": "postgres",
+  "port": 5432
+}
+```
+
+1. 进入Supabase Dashboard中你的项目的[数据库设置]（https://app.supabase.com/project/_/settings/database）。
+1. 在**连接信息**下，复制主机字符串并替换你的`supabase-service.json`文件中的条目。
+1. 在`supabase-service.json`文件的`password`条目中输入你在创建Supabase项目时使用的密码。
+
+##生成一个Firebase私钥 {#generate-firebase-private-key} 1.
+
+1. 登录到你的[Firebase控制台](https://console.firebase.google.com/project)并打开你的项目。
+1. 点击侧边栏中**项目概览旁边的齿轮图标，选择**项目设置**。
+1. 点击**服务账户**，选择**Firebase Admin SDK**。
+1. 单击**生成新的私钥**。
+1. 将下载的文件重命名为`firebase-service.json`。
+
+##保存你的Firebase密码哈希参数 {#save-firebase-hash-parameters}.
+
+1. 登录到你的[Firebase控制台](https://console.firebase.google.com/project)并打开你的项目。
+1. 在侧边栏中选择**认证**（构建部分）。
+1. 在顶部菜单中选择**用户**。
+1. 在用户列表的右上方，打开菜单（3个点），点击**密码哈希参数**。
+1. 复制并保存`base64_signer_key`、`base64_salt_separator`、`rounds`和`mem_cost`的参数。
+
+```bash title=Sample%20password%20hash%20parameters
+hash_config {
+  algorithm: SCRYPT,
+  base64_signer_key: XXXX/XXX+XXXXXXXXXXXXXXXXX+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX==,
+  base64_salt_separator: Aa==,
+  rounds: 8,
+  mem_cost: 14,
+}
+```
+
+## 命令行选项
+
+###将Firestore用户转储为JSON文件 {#dump-firestore-users}
+
+`node firestoreusers2json.js [<filename.json>] [<batch_size>]`node firestoreusers2json.js
+
+- `filename.json`: (可选)输出文件名（默认为`./users.json`）。
+- `batchSize`: (可选)每个批次要获取的用户数量(默认为100)
+
+### 向Supabase Auth导入JSON用户文件 (PostgreSQL: auth.users) {#import-json-users-file}
+
+`node import_users.js <path_to_json_file> [<batch_size>]`。
+
+- `path_to_json_file`：.json输入文件（用户）的完整本地路径和文件名。
+- `batch_size`: (可选)一个批次中要处理的用户数量(默认为100)
+
+## 注释
+
+对于更高级的迁移，包括使用中间件服务器组件来验证用户现有的Firebase密码，并在用户第一次登录时在Supabase项目中更新该密码，请参阅[firebase-to-supabase repo]（https://github.com/supabase-community/firebase-to-supabase/tree/main/auth）。
+
+## 资源
+
+- [Supabase vs Firebase](https://supabase.com/alternatives/supabase-vs-firebase)
+- [Firestore数据迁移](/docs/guides/migrations/firestore-data)
+- [Firestore存储迁移](/docs/guides/migrations/firebase-storage)
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

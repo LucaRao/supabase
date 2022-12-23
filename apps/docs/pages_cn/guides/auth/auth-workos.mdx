@@ -1,0 +1,93 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'auth-workos',
+  title: '使用WorkOS登录',
+  description: '在你的Supabase项目中加入WorkOS OAuth',
+}
+
+要为你的项目启用WorkOS Auth，你需要设置WorkOS OAuth应用程序，并将应用程序的凭证添加到你的Supabase仪表板。
+
+## 概述
+
+在本指南中，我们将介绍如何使用Supabase OAuth和WorkOS来实现单点登录（SSO）。
+
+该过程包括五个主要步骤。
+
+- 在你的WorkOS仪表板上创建一个新的组织。
+- 从配置选项卡中获得 `客户端ID`，并配置重定向URI。
+- 从证书标签中获得 `WorkOS Secret`。
+- 连接一个WorkOS支持的身份提供者
+- 在Supabase项目中加入你的WorkOS凭证
+
+## 创建一个WorkOS组织
+
+登录到仪表板，跳到 `组织`选项卡，创建一个组织。
+![创建一个组织](/docs/img/guides/auth-workos/workos-creat-organization.png)
+
+## 获得客户ID并配置重定向URI
+
+前往配置选项卡，配置重定向URI。重定向URI应该看起来像`https://<project-ref>.supabase.co/auth/v1/callback`。
+请注意，这与Supabase仪表板中提到的重定向URI不同。
+
+![Fetch Client ID and configure Redirect URI](/docs/img/guides/auth-workos/workos-clientid-redirect-uri.png)
+
+## 获得WorkOS密匙
+
+前往API密钥页面，获取秘密密钥。
+
+![WorkOS Secret Key](/docs/img/guides/auth-workos/workos-secret-key.png)
+
+## 连接一个WorkOS支持的身份提供者
+
+通过访问设置链接来设置身份提供者。
+
+![Visiting the setup link](/docs/img/guides/auth-workos/workos-setup-identity-provider.png)
+
+你可以从WorkOS支持的众多身份提供者中选择任何一个。
+
+## 将你的 WorkOS 凭证加入你的 Supabase 项目中
+
+- 进入你的[Supabase项目仪表板](https://app.supabase.com)
+- 在左边的侧边栏，点击 `认证`图标（靠近顶部）。
+- 从列表中点击 `设置`，进入 `认证设置`页面
+- 在 `外部OAuth供应商`下，将 `WorkOS已启用`调至 `ON`。
+- 输入前面步骤中保存的 `客户端ID`、`密码`和 `WorkOS URL`。`WorkOS URL`的设置应该设置为https://api.workos.com/。
+- 点击 `保存`。
+
+## 将登录代码添加到你的客户端应用程序
+
+当你的用户登录时，调用[signInWithOAuth()](/docs/reference/javascript/auth-signinwithoauth)，将`workos`作为`provider`。
+
+```js
+async function signInWithWorkOS() {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'workos',
+    options: {
+      queryParams: {
+        connection: '<your_connection>',
+        organization: '<your_organization',
+        provider: '<your_provider>',
+      },
+    },
+  })
+}
+```
+
+请参考 [WorkOS 文档](https://workos.com/docs/reference/sso/authorize/) 以了解更多关于不同方法的信息。
+
+当你的用户签出时，调用[signOut()](/docs/reference/javascript/auth-signout)，将他们从浏览器会话中删除，并从localStorage中删除任何对象。
+
+```js
+async function signout() {
+  const { error } = await supabase.auth.signOut()
+}
+```
+
+资源
+
+- [WorkOS文档](https://workos.com/docs/sso/guide)
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

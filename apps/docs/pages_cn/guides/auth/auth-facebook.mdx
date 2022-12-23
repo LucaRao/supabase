@@ -1,0 +1,112 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'auth-facebook',
+  title: '用Facebook登录',
+  description: '在你的Supabase项目中加入Facebook OAuth',
+}
+
+要为你的项目启用Facebook Auth，你需要设置一个Facebook OAuth应用程序，并将应用程序的凭证添加到你的Supabase仪表板。
+
+## 概述
+
+为你的应用程序设置Facebook登录，包括3个部分。
+
+- 在[Facebook开发者网站]上创建和配置一个Facebook应用程序(https://developers.facebook.com)
+- 将你的Facebook密钥添加到你的[Supabase项目](https://app.supabase.com)
+- 将登录代码添加到您的[Supabase JS客户端应用程序](https://github.com/supabase/supabase-js)
+
+## 访问你的Facebook开发者账户
+
+- 转到[developer.facebook.com](https://developers.facebook.com)。
+- 点击右上方的 "登录 "来登录。
+
+![Facebook Developer Portal.](/docs/img/guides/auth-facebook/facebook-portal.png)
+
+## 创建一个Facebook应用程序
+
+- 点击右上角的 `我的应用程序`。
+- 点击右上方的 `创建应用程序`。
+- 选择你的应用程序类型，并点击 `继续`。
+- 填写你的应用信息，然后点击 `创建应用`。
+- 这将把你带到屏幕上。`为您的应用程序添加产品`。(或者你可以点击左侧边栏中的 `添加产品`来进入这个屏幕。)
+
+## 找到你的回调URI
+
+下一步需要一个回调URI，它看起来像这样。
+
+`https://<project-ref>.supabase.co/auth/v1/callback`
+
+- 进入你的[Supabase项目仪表板](https://app.supabase.com)。
+- 点击左侧边栏底部的 `设置`图标。
+- 点击列表中的 `API`。
+- 在配置/URL下，你会发现你的API URL，你可以点击`复制`将其复制到剪贴板。
+- 现在只要在后面加上`/auth/v1/callback`就可以得到完整的`OAuth Redirect URI`。
+
+<video width="99%" muted playsInline controls="true">
+  <source src="/docs/videos/api/api-url-and-key.mp4" type="video/mp4" muted playsInline />
+</video>
+
+## 为你的Facebook应用程序设置FaceBook登录
+
+在 "添加产品到您的应用程序 "屏幕上。
+
+- 点击 `Facebook登录`下的 `设置`。
+- 跳过 `快速启动`屏幕，在左侧边栏点击 `Facebook登录`下的 `设置`。
+- 在 `Facebook登录设置`页面的 `有效的OAuth重定向URI`下输入你的回调URI
+- 在 `Valid OAuth Redirect URIs`框中输入这个信息。
+- 点击右下角的 `保存更改`。
+
+请注意，你必须在你的Facebook应用程序上设置正确的访问级别，使第三方应用程序能够读取电子邮件地址。
+在 `应用程序审查 -> 权限和功能`屏幕上。
+
+- 点击`public_profile`和`email`右边的`Request Advanced Access`按钮。
+
+你可以阅读更多关于访问级别的信息[这里](https://developers.facebook.com/docs/graph-api/overview/access-levels/)
+
+## 复制你的Facebook应用ID和密码
+
+- 点击左侧边栏的 `设置/基本`。
+- 从 `基本设置`页面的顶部复制你的应用程序ID
+- 在 `应用程序的秘密`下点击 `显示`，然后复制你的秘密
+- 确保在这个屏幕上完成所有必要的字段。
+
+## 将你的Facebook应用程序ID和秘密输入你的Supabase项目中
+
+- 转到你的[Supabase项目仪表板](https://app.supabase.com)
+- 在左边的侧栏，点击 `认证`图标（靠近顶部）。
+- 从列表中点击 `设置`，进入 `认证设置`页面
+- 在 `网站URL`下输入你的应用程序的最终（托管）URL（这很重要）。
+- 在 `外部OAuth供应商`下，将 `启用Facebook`设为 `打开`。
+- 输入你在上一步保存的 `Facebook客户端ID`和 `Facebook秘密`。
+- 点击 `保存`。
+
+## 将登录代码添加到你的客户端应用程序
+
+当你的用户登录时，调用[signInWithOAuth()](/docs/reference/javascript/auth-signinwithoauth)，将`facebook`作为`供应商`。
+
+```js
+async function signInWithFacebook() {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'facebook',
+  })
+}
+```
+
+当你的用户签出时，调用[signOut()](/docs/reference/javascript/auth-signout)，将他们从浏览器会话和任何对象从localStorage中移除。
+
+```js
+async function signout() {
+  const { error } = await supabase.auth.signOut()
+}
+```
+
+## 资源
+
+- [Supabase帐户 - 免费层](https://supabase.com)
+- [Supabase JS客户端](https://github.com/supabase/supabase-js)
+- [Facebook开发者仪表板](https://developers.facebook.com/)
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

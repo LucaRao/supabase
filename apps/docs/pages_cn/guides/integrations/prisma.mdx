@@ -1,0 +1,168 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'prisma',
+  title: 'Prisma',
+  description: '将你的Supabase postgres数据库连接到你的Prisma项目。',
+}
+
+本指南介绍了如何将Supabase提供的Postgres数据库快速连接到Prisma项目中。
+
+[Prisma](https://prisma.io)是一个[开放源代码](https://github.com/prisma/prisma)的下一代ORM。它由以下部分组成。
+
+- **Prisma客户端**。用于Node.js和TypeScript的自动生成和类型安全的查询生成器。
+- **Prisma Migrate**: 迁移系统。
+- **Prisma Studio**: 用于查看和编辑数据库中的数据的图形用户界面。
+
+## 第1步：从Supabase项目设置中获取连接字符串
+
+从侧边栏进入设置页面，导航到**数据库**标签。你会发现数据库的连接字符串，其中有一个占位符，是你创建项目时提供的密码。
+![Getting the connection string](/docs/img/guides/integrations/prisma/zntcsh3ic91gf1gy8j73.png)
+
+## 第二步：测试连接
+
+为了确保一切工作正常，让我们在Prisma项目中尝试连接字符串。
+
+如果你已经有一个，你需要做的就是在你的`.env`文件中把`DATABASE_URL`设置为连接字符串（包括密码），然后你就可以开始了。
+
+如果你没有Prisma项目或者这是你第一次使用Prisma，你将使用[quickstart](https://www.prisma.io/docs/getting-started/quickstart)指南中的 repo。
+
+### 克隆启动项目
+
+导航到你选择的目录，如果你是在Windows机器上，在终端运行以下命令。
+
+```bash
+curl https://pris.ly/quickstart -L -o quickstart-main.tar.gz && tar -zxvf quickstart-main.tar.gz quickstart-main/typescript/starter && move quickstart-main\typescript\starter starter && rmdir /S /Q quickstart-main && del /Q quickstart-main.tar.gz
+```
+
+而如果你使用的是Mac OS或Linux，运行以下命令。
+
+```bash
+curl -L https://pris.ly/quickstart | tar -xz --strip=2 quickstart-main/typescript/starter
+```
+
+现在你可以导航到该目录并安装项目的依赖性。
+
+```bash
+cd starter && npm install
+```
+
+### 看看这个项目的结构
+
+这个项目已经配置了TypeScript，它的结构如下。
+
+- 一个`prisma`目录，其中包含。
+  - 一个`dev.db`文件。这是一个SQLite数据库。
+  - 一个`schema.prisma`文件。我们在这里定义不同的数据库模型和它们之间的关系。
+- 一个`.env`文件。包含`DATABASE_URL`变量，Prisma将使用它。
+- 一个`script.ts`文件：我们将在这里使用Prisma客户端运行一些查询。
+  这个启动程序也安装了以下软件包。
+- [`@prisma/client`](https://www.npmjs.com/package/@prisma/client)。一个自动生成的、类型安全的查询生成器，它是为你的数据_定制的。
+- [`prisma`](https://www.npmjs.com/package/prisma)。Prisma的命令行界面（CLI）。它允许你初始化新的项目资产，生成Prisma客户端，并通过内省分析现有的数据库结构，自动创建你的应用模型。
+  > 注意：Prisma同时适用于JavaScript和TypeScript。然而，为了获得最佳的开发体验，强烈建议使用TypeScript。
+
+### 配置项目以使用PostgreSQL
+
+继续前进，删除`prisma/dev.db`文件，因为我们将切换到PostgreSQL。
+接下来，在`prisma/.env`文件中，将`DATABASE_URL`变量的值更新为你在**步骤1**得到的连接字符串。这个URL可能看起来如下。
+
+```env
+# prisma/.env
+postgres://postgres:[YOUR-PASSWORD]@db.vdbnhqozmlzdsaejdxwr.supabase.co:5432/postgres
+```
+
+最后，在你的`schema.prisma`文件中，将`provider`从 `sqlite`改为`"postgresql"`。
+这就是你的`schema.prisma`文件的样子。
+
+```go
+datasource db {
+  provider = “postgresql”
+  url      = env(“DATABASE_URL”)
+}
+generator client {
+  provider = “prisma-client-js”
+}
+model Post {
+  id        Int     @id @default(autoincrement())
+  title     String
+  content   String?
+  published Boolean @default(false)
+  author    User?   @relation(fields: [authorId], references: [id])
+  authorId  Int?
+}
+model User {
+  id    Int     @id @default(autoincrement())
+  email String  @unique
+  name  String?
+  posts Post[]
+}
+```
+
+为了测试一切工作是否正常，运行以下命令来创建一个迁移。
+
+```bash
+prisma migrate dev --name init
+```
+
+你可以根据你所做的改动，选择性地给你的迁移起一个名字。由于这是项目的第一次迁移，你要把`--name`标志设置为 "init"。
+如果一切工作正常，你应该在终端机上得到以下信息。
+
+```text
+Your database is now in sync with your schema.
+:heavy_check_mark: Generated Prisma Client (2.x.x) to ./node_modules/@prisma/client in 111ms
+```
+
+这将在你的`prisma`目录下创建一个`prisma/migrations`文件夹，并将你的Prisma模式与数据库模式同步。
+
+> 注意：如果你想跳过创建迁移历史的过程，你可以使用[`db push`](https://www.prisma.io/docs/concepts/components/prisma-migrate/db-push)命令而不是`migrate dev`。
+> 如果你进入你的Supabase项目，在表编辑器中，你应该看到已经创建了两个表，一个`Post'和一个`User'表。
+>！[在用户界面中创建的表](/docs/img/guides/integrations/prisma/7y4qq4wwvfrheti6r09u.png)
+> 这就是了! 你现在已经成功地将一个Prisma项目连接到Supabase上托管的PostgreSQL数据库，并运行了你的第一次迁移。
+
+## 使用Supabase的连接池
+
+如果你在无服务器环境中工作（例如托管在AWS Lambda、Vercel或Netlify Functions上的Node.js函数），你需要使用[PgBouncer](https://www.pgbouncer.org/)等工具设置[连接池](https://www.prisma.io/docs/guides/performance-and-optimization/connection-management#serverless-environments-faas)。这是因为每一个函数的调用都可能导致一个[到数据库的新连接](https://www.prisma.io/docs/guides/performance-and-optimization/connection-management#the-serverless-challenge)。Supabase[支持使用PgBouncer进行连接管理](https://supabase.io/blog/2021/04/02/supabase-pgbouncer#what-is-connection-pooling)，并且默认为启用。
+从 Supabase 仪表板的侧栏转到**数据库**页，并导航到**连接池**设置
+![Connection pool settings](/docs/img/guides/integrations/prisma/w0oowg8vq435ob5c3gf0.png)
+当运行迁移时，你需要使用非池化连接的URL（就像我们在**步骤1中使用的那个）。然而，当部署你的应用程序时，你将使用池化连接的URL，并在PostgreSQL连接URL中添加`?pgbouncer=true`的标志。为了尽量减少并发连接的数量，也建议将`connection_limit`设置为`1`。因此，URL可能看起来如下。
+
+```env
+# prisma/.env
+postgres://postgres:[YOUR-PASSWORD]@db.vdbnhqozmlzdsaejdxwr.supabase.co:6543/postgres?pgbouncer=true&connection_limit=1
+```
+
+Prisma Migrate使用数据库事务来检查出数据库和迁移表的当前状态。然而，Migration Engine被设计为使用与数据库的单一连接，并且不支持与PgBouncer的连接池。如果你试图在任何使用PgBouncer进行连接池的环境中运行Prisma Migrate命令，你可能会看到以下错误。
+
+```bash
+Error: undefined: Database error
+Error querying the database: db error: ERROR: prepared statement “s0” already exists
+```
+
+这是一个已知的问题，正在努力解决，你可以在这个[GitHub问题](https://github.com/prisma/prisma/issues/6485)上关注进展。
+如果你想了解更多关于Prisma的信息，请查看[docs](https://www.prisma.io/docs)。另外，如果你有任何问题或遇到任何问题，请随时在该仓库的[讨论部分](https://github.com/prisma/prisma/discussions)中展开讨论。
+
+## 故障排除
+
+如果你多次运行`prisma migrate dev --name init`，它有时会问你是否要重新创建整个模式。如果你选择了 "是"，它将删除公共模式并重新创建它。在这之后，默认的授予就不见了。如果你遇到这个问题，请添加一个用于修复授予的辅助SQL。
+
+```sql
+grant usage on schema public to postgres, anon, authenticated, service_role;
+
+grant all privileges on all tables in schema public to postgres, anon, authenticated, service_role;
+grant all privileges on all functions in schema public to postgres, anon, authenticated, service_role;
+grant all privileges on all sequences in schema public to postgres, anon, authenticated, service_role;
+
+alter default privileges in schema public grant all on tables to postgres, anon, authenticated, service_role;
+alter default privileges in schema public grant all on functions to postgres, anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to postgres, anon, authenticated, service_role;
+```
+
+## 资源
+
+- [Prisma](https://prisma.io) 官方网站。
+- [Prisma GitHub](https://github.com/prisma/prisma)。
+- [Prisma](https://www.prisma.io/docs/) 文档。
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

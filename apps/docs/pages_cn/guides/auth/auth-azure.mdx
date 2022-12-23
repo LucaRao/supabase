@@ -1,0 +1,102 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'auth-azure',
+  title: '使用Azure登录',
+  description: '将Azure OAuth添加到您的Supabase项目',
+}
+
+若要为您的项目启用Azure Auth，您需要设置Azure OAuth应用程序，并将应用程序凭据添加到Supabase 项目仪表。
+
+## 概述
+
+Azure OAuth由四个主要步骤组成：
+
+- 在Azure Active Directory下创建应用程序。
+- 获取具有“使用Azure登录”功能的`应用程序（客户端）ID`。这将用作`客户端id`。
+- 创建具有“使用Azure登录”功能的 `Secret ID`。机密的值将用作`client secret`。
+- 将应用程序的回调url添加到允许列表中。
+
+## 访问你的Azure开发者帐户
+
+- 跳转到[portal.azure.com](https://portal.azure.com/#home).
+- 登录并在Azure服务列表下选择“Azure Active Directory”。 
+
+## 注册应用程序
+
+- 在Azure Active Directory下，在侧面板中选择 `应用程序注册` 
+- 选择`新注册`.
+- 为支持的帐户类型选择名称并选择首选选项。
+- 指定`重定向URI`。
+- 重定向/回调URI应如下所示：`https://<project-ref>.supabase.co/auth/v1/callback` 
+- 单击表单底部的`注册`。
+
+![注册应用程序.](/docs/img/guides/auth-azure/azure-register-app.png)
+
+## 获取客户端ID
+
+当您进行API调用以验证用户时，这将用作`client_id`。
+
+- 应用程序注册后，可以在[应用程序注册列表](https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/RegisteredApps)下找到客户端id在标题为`应用程序（客户端）ID`的列下。 
+
+![获取客户端id](/docs/img/guides/auth-azure/azure-client-id.png)
+
+## 获取秘密ID
+
+当您进行API调用以验证用户时，这将用作`client_secret`。
+
+- 单击上面注册的应用程序的名称。
+- 在`Essentials`下，单击`Client credentials`。
+- 导航到`Client secrets`选项卡并选择  `New client secret`。 
+- 输入描述并选择您的首选密钥过期日期。
+- 生成密钥后，保存`value`（而不是密钥ID）。
+
+![获取 client secret](/docs/img/guides/auth-azure/azure-client-secret.png)
+
+## 获取租户URL
+
+这将允许您的用户在登录时使用自定义Azure登录页面。
+
+- 选择目录（租户）ID值。
+- Azure租户URL应如下所示: `https://login.microsoftonline.com/<tenant-id>`
+
+![获取租户URL](/docs/img/guides/auth-azure/azure-tenant-url.png)
+
+## 将登录代码添加到客户端应用程序
+
+<Admonition type="tip">
+
+Supabase Auth要求Azure返回一个有效的电子邮件地址。因此，你必须在上面的`signIn`方法中请求`email`范围。
+
+</Admonition>
+
+当您的用户登录时，调用[signInWithOAuth()](/docs/reference/javascript/auth signingwiththoauth)，将`azure`作为`provider`： 
+```js
+async function signInWithAzure() {
+  const { data, error } = await supabase.auth.signInWithOAuth(
+    {
+      provider: 'azure',
+    },
+    {
+      scopes: 'email',
+    }
+  )
+}
+```
+
+当用户注销时，调用[signOut()](/docs/reference/javascript/auth-signout)将其从浏览器会话和localStorage中删除：
+
+```js
+async function signout() {
+  const { error } = await supabase.auth.signOut()
+}
+```
+
+## 资料
+
+- [Azure开发者帐户](https://portal.azure.com)
+- [GitHub Discussion](https://github.com/supabase/gotrue/pull/54#issuecomment-757043573)
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

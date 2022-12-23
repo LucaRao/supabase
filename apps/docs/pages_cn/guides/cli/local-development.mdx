@@ -1,0 +1,261 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'local-development',
+  title: '本地开发',
+  description: '如何在你的本地开发机器上使用Supabase。',
+}
+
+了解如何使用 Supabase CLI 在本地开发你的项目并部署到 Supabase 平台。
+
+<div className="video-container">
+  <iframe
+    src="https://www.youtube-nocookie.com/embed/vyHyYpvjaks"
+    frameBorder="1"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+    allowFullScreen
+  ></iframe>
+</div>
+
+## 前提条件
+
+确保你在你的本地机器上安装了这些东西。
+
+- [Docker](https://docs.docker.com/engine/install/)
+- [Git](https://github.com/git-guides/install-git)
+- [Supabase CLI](/docs/guides/cli)
+
+## 登录到Supabase CLI
+
+```bash
+supabase login
+```
+
+## 初始化你的项目
+
+为你的项目创建一个新的文件夹并启动一个新的git仓库。
+
+```bash
+# create your project folder
+mkdir your-project
+
+# move into the new folder
+cd your-project
+
+# start a new git repository
+git init
+```
+
+## 启动Supabase服务
+
+[Initialize](/docs/reference/cli/usage#supabase-init) Supabase为在本地开发你的项目设置了配置。
+
+```bash
+supabase init
+```
+
+确保Docker正在运行。[start](/docs/reference/cli/usage#supabase-start)命令使用Docker来启动Supabase的[service](/docs/architecture)。
+如果是第一次使用CLI，这个命令可能需要运行一段时间。
+
+```bash
+supabase start
+```
+
+一旦所有的 Supabase 服务都在运行，你会看到包含你的本地 Supabase 凭证的输出。
+你可以在任何时候使用 [stop](/docs/reference/cli/usage#supabase-stop) 命令来停止所有服务。
+
+## 访问服务
+
+你可以用任何Postgres客户端直接访问服务，或者通过API网关（[Kong](https://github.com/Kong/kong)）。
+
+<Tabs
+  scrollable
+  size="small"
+  type="underlined"
+  defaultActiveId="postgres"
+>
+<TabPanel id="postgres" label="Postgres">
+
+```sh
+# Default URL:
+postgresql://postgres:postgres@localhost:54322/postgres
+```
+
+本地Postgres实例可以通过[`psql`](https://www.postgresql.org/docs/current/app-psql.html)
+或任何其他Postgres客户端，如[pgadmin](https://www.pgadmin.org/)。
+
+例如：
+
+```bash
+psql 'postgresql://postgres:postgres@localhost:54322/postgres'
+```
+
+<Admonition type="note">
+
+要从本地Supabase设置中的边缘函数访问数据库，请将`localhost`替换为`host.docker.internal`。
+
+</Admonition>
+
+</TabPanel>
+<TabPanel id="kong" label="API Gateway">
+
+```sh
+# Default URL:
+http://localhost:54321
+```
+
+如果你在没有客户端库的情况下访问这些服务，你可能需要将客户端密钥作为 "授权 "头来传递。
+了解更多关于[JWT头]（/docs/learn/auth-deep-dive/auth-deep-dive-jwts）。
+
+```sh
+curl 'http://localhost:54321/rest/v1/' \
+    -H "apikey: <anon key>" \
+    -H "Authorization: Bearer <anon key>"
+
+http://localhost:54321/rest/v1/           # REST (PostgREST)
+http://localhost:54321/realtime/v1/       # Realtime
+http://localhost:54321/storage/v1/        # Storage
+http://localhost:54321/auth/v1/           # Auth (GoTrue)
+```
+
+<Admonition type="note">
+
+`<anon key>` is provided when you run the command `supabase start`.
+
+</Admonition>
+
+</TabPanel>
+</Tabs>
+
+## 数据库迁移
+
+数据库的变化是通过 "迁移 "来管理的。数据库迁移是跟踪你的数据库随时间变化的一种常见方式。
+
+<div className="video-container">
+  <iframe
+    src="https://www.youtube-nocookie.com/embed/Kx5nHBmIxyQ"
+    frameBorder="1"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+    allowFullScreen
+  ></iframe>
+</div>
+
+### 进行数据库修改
+
+在本指南中，创建一个名为 "employees "的表。在Supabase Studio中，导航到**SQL编辑器**页，运行以下SQL命令。
+
+```sql
+create table employees (
+	id integer primary key generated always as identity,
+	name text
+);
+```
+
+<Admonition type="note">
+
+你可以使用[`supabase status`](/docs/reference/cli/usage#supabase-status)所显示的`DB URL`执行任何SQL。
+
+</Admonition>
+
+运行[`db diff`](/docs/reference/cli/usage#supabase-db-diff)命令来检测本地数据库的变化。
+
+```sh
+supabase db diff create_employees -f create_employees
+```
+
+这将创建一个名为`supabase/migrations/<timestamp>_create_employees.sql`的新迁移，代表自[`supabase start`](/docs/reference/cli/usage#supabase-start)以来对本地数据库的任何修改。
+
+### 添加样本数据
+
+使用`supabase/seed.sql`中的种子脚本（用[`supabase init`](/docs/reference/cli/usage#supabase-init)创建）向表中添加样本数据。
+
+```sql
+-- in supabase/seed.sql
+insert into public.employees (name)
+values
+  ('Erlich Backman'),
+  ('Richard Hendricks'),
+  ('Monica Hall');
+```
+
+重新运行迁移和种子脚本。
+
+```bash
+supabase db reset
+```
+
+现在你应该在Studio中看到`employees`的内容。
+
+### 重置数据库变化
+
+使用[`reset`](/docs/reference/cli/usage#supabase-db-reset)命令来恢复本地数据库的任何变化。
+
+```sql
+-- run on local database to make a change
+alter table employees
+  add department text default 'Hooli';
+```
+
+运行下面的命令来重置本地数据库。
+
+```sh
+supabase db reset
+```
+
+## 部署你的项目
+
+进入[Supabase Dashboard](https://app.supabase.com)并创建一个项目来部署这些变化。
+
+### 连接你的项目
+
+<Admonition type="note">
+
+连接你的项目需要几个命令。我们正在将这些命令合并成一个单一的命令。请和我们一起努力!
+
+</Admonition>
+
+使用[`supabase link`](/docs/reference/cli/usage#supabase-link)将你的项目与你的远程项目联系起来。
+
+```bash
+supabase link --project-ref <project-id>
+# You can get <project-id> from your project’s dashboard URL: https://app.supabase.com/project/<project-id>
+
+supabase db remote commit
+# Capture any changes that you have made to your database before setting up the CLI
+```
+
+`supabase/migrations`现在被填充到`..._remote_commit.sql`中的迁移。
+这个迁移捕获了你的本地数据库所需的任何变化，以匹配你的远程Supabase项目的模式。
+
+### 部署数据库变化
+
+使用[`db push`]（/docs/reference/cli/usage#supabase-db-push）部署任何本地数据库迁移。
+
+```sh
+supabase db push
+```
+
+### 部署边缘函数
+
+使用[`functions deploy`]（/docs/reference/cli/usage#supabase-functions-deploy）部署任何边缘函数。
+
+```sh
+supabase functions deploy <function_name>
+```
+
+## 限制因素
+
+本地开发环境的功能并不像Supabase平台那样完整。以下是其中的一些不同之处。
+
+- 存储界面即将推出。
+- 函数接口即将推出。
+- 日志不支持通过接口（但是你可以通过Docker容器访问它们）。
+- 你不能在Dashboard中更新你的项目设置--这必须通过CLI完成。
+
+```
+
+```
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

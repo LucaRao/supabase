@@ -1,0 +1,60 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'database-usage',
+  title: '数据库的使用',
+  description: '了解数据库的使用如何适用于你的订阅。',
+}
+
+数据库存储是指月平均存储用量，由Postgres报告。这个指标在你的项目的[billing usage](https://app.supabase.com/project/_/settings/billing/usage)中报告，每天更新。
+
+为了即时了解数据库存储的使用情况，你可以在Postgres中执行。
+
+```sql
+select sum(pg_database_size(pg_database.datname)) / (1024 * 1024) as db_size_mb
+from pg_database;
+```
+
+这个值也会在[数据库设置页面](https://app.supabase.com/project/_/settings/database)中报告。
+
+## 数据库存储管理
+
+一旦你的项目达到95%的订阅配额，你的项目就会被改为只读模式，防止进一步写入你的项目。
+在只读模式下，客户会遇到诸如 `无法在只读事务中执行INSERT`的错误。
+
+一旦数据库存储使用量下降到95%以下，常规操作（读写模式）将自动重新启用。
+
+如果你使用的是专业版或企业版，数据库存储会自动扩展，但是如果填充数据库的速度超过了它的扩展速度，你也可能遇到这个错误。
+
+Supabase使用网络附加存储，在性能和可扩展性之间取得平衡。专业项目可以存储多达1024TB。
+如果你打算增长超过这个数字，请联系我们的团队，了解更多关于我们企业级的信息。
+
+### 增加可用的数据库存储
+
+1. [升级到专业或企业计划](https://app.supabase.com/project/_/settings/billing/subscription)以增加你的存储配额。
+
+2. 从你的项目数据库中删除数据，以降低其磁盘使用率。如果你的数据库已经处于只读模式，运行下面的命令，将你的会话的交易模式改为读写。
+
+   ```sql
+   SET default_transaction_read_only = 'off';
+   ```
+
+   这允许你从会话中删除数据。
+
+## 真空操作
+
+Postgres不会立即回收DB中死的图元（即被删除的行）所使用的物理空间。相反，在执行[真空操作](https://www.postgresql.org/docs/current/routine-vacuuming.html)之前，它们被内部标记为已被删除。
+因此，从你的数据库中删除数据可能不会立即减少报告的磁盘使用率。
+
+<Admonition type="note">
+
+真空操作可以暂时增加资源利用率，这可能对你的项目的观察性能产生不利影响，直到维护完成。
+
+</Admonition>
+
+Supabase项目已经启用了自动吸尘功能，这可以确保定期执行这些操作以保持数据库的健康和性能。
+然而，可能需要[微调](https://www.percona.com/blog/2018/08/10/tuning-autovacuum-in-postgresql-and-autovacuum-internals/)[自动真空参数](https://www.enterprisedb.com/blog/postgresql-vacuum-and-analyze-best-practice-tips)。 或者[手动启动](https://www.postgresql.org/docs/current/sql-vacuum.html)真空操作。 例如，在从数据库中删除大量数据后，运行手动真空操作可以帮助减少Postgres报告的磁盘使用率。
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

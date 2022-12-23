@@ -1,0 +1,305 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'auth-twilio',
+  title: '使用Twilio的电话授权',
+  description: '如何用Twilio和Supabase设置和使用移动OTP。',
+}
+
+## 概述
+
+在本指南中，我们将向您展示如何使用基于 SMS 的一次性密码 (OTP) 令牌来验证您的用户。
+
+使用 Supabase SMS OTP 令牌有两个原因。
+
+- 您想让用户用手机号码+密码登录，并且手机号码应通过短信进行验证
+- 你希望用户只用手机号码登录（即无密码登录）。
+
+我们将介绍。
+
+- 找到你的Twilio证书](#finding-your-twilio-credentials)
+- 使用OTP和基于密码的登录] (#using-otp-with-password-based-logins)
+- 使用OTP作为无密码登录机制](#using-otp-as-passwordless-sign-in-mechanism)
+
+你需要的东西。
+
+- 一个Twilio账户（在这里注册：https://www.twilio.com/try-twilio）。
+- 一个Supabase项目（在这里创建一个：https://app.supabase.com）。
+- 一个能够接收短信的手机
+
+## 视频
+
+<div className="video-container">
+  <iframe
+    src="https://www.youtube-nocookie.com/embed/akScoPO01bc"
+    frameBorder="1"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+    allowFullScreen
+  ></iframe>
+</div>
+
+## 步骤
+
+### 找到你的Twilio凭证
+
+首先登录你的Twilio账户并开始一个新的项目：https://www.twilio.com/console/projects/create
+
+给你的项目取个名字，并验证你要用来测试的手机号码。这是一个将接收短信OTP的号码。
+
+![Name your twilio project](/docs/img/guides/auth-twilio/1.png)
+![verify your own phone number](/docs/img/guides/auth-twilio/2.png)
+
+在欢迎表格中选择 `短信`、`身份和验证`以及 `带密码`作为选项。
+
+![Form Fields](/docs/img/guides/auth-twilio/3.png)
+
+当你回到[Twilio控制台屏幕](https://www.twilio.com/console)时，你需要向下滚动并点击'获得一个试用电话号码'--这是你要发送短信的号码。
+
+![Get a trial phone number](/docs/img/guides/auth-twilio/4.png)
+
+![Successful phone number](/docs/img/guides/auth-twilio/5.png)
+
+现在你应该能够看到你需要的所有三个数值，以便开始工作。
+
+- 帐户SID
+- 授权令牌
+- 发件人电话号码
+
+![All the credentials you'll need](/docs/img/guides/auth-twilio/6.png)
+
+现在去Supabase仪表板上的Auth > Settings页面（https://app.supabase.com/project/YOUR-PROJECT-REF/auth/settings）。
+
+你应该看到一个选项来启用电话注册。
+
+![Enable Phone Sign-Up](/docs/img/guides/auth-twilio/7.png)
+
+拨动它，并从 twilio 仪表板上复制3个值。点击保存。
+
+注意：对于 "Twilio消息服务SID"，你可以使用上面生成的发送者电话号码。
+
+![Plug in Twilio credentials](/docs/img/guides/auth-twilio/8.png)
+
+现在后台应该已经设置好了，我们可以继续添加我们的客户端代码了!
+
+#### 短信定制模板
+
+发送到手机上的包含OTP代码的短信可以被定制。如果你需要提到一个品牌名称或显示一个网站地址，这很有用。
+
+进入 Supabase 仪表板中的 Auth > Templates 页面 (https://app.supabase.com/project/YOUR-PROJECT-REF/auth/templates)。
+
+在模板中使用变量`.Code`来显示OTP代码。下面是SMS模板中的一个例子。
+
+![example in the SMS template](/docs/img/guides/auth-twilio/9.png)
+
+### 使用OTP与基于密码的登录
+
+在这种情况下，我们将使用用户的手机号码和相应的密码，作为用电子邮件地址注册的替代方法。注意：在使用电话号码和密码组合注册时，请彻底考虑潜在的安全问题。当用户取消电话合同或搬家时，电话号码有时会被电话网络回收，从而将用户账户的访问权授予该电话号码的后续所有者。在不久的将来，Supabase将支持多因素认证，这将减轻这种风险，但现在你可能要考虑让你的用户在紧急情况下通过其他方式恢复他们的账户。
+
+在客户端使用supabase-js，你要使用与基于电子邮件的注册相同的`signUp`方法，但使用`phone`参数而不是`email参数`。
+
+<Tabs
+  scrollable
+  size="small"
+  type="underlined"
+  defaultActiveId="js"
+>
+<TabPanel id="js" label="JavaScript">
+
+```js
+let { user, error } = await supabase.auth.signUp({
+  phone: '+13334445555',
+  password: 'some-password',
+})
+```
+
+</TabPanel>
+<TabPanel id="http" label="HTTP">
+
+```bash
+curl -X POST 'https://cvwawazfelidkloqmbma.supabase.co/auth/v1/signup' \
+-H "apikey: SUPABASE_KEY" \
+-H "Content-Type: application/json" \
+-d '{
+  "phone": "+13334445555",
+  "password": "some-password"
+}'
+```
+
+</TabPanel>
+</Tabs>
+
+用户现在会收到一条短信，上面有一个6位数的密码，你需要在60秒内收到他们的密码，然后他们才能登录他们的账户。
+
+你应该向用户提供一个表格，让他们输入6位数的密码，然后把它和电话号码一起发送给 `verifyOTP`。
+
+<Tabs
+  scrollable
+  size="small"
+  type="underlined"
+  defaultActiveId="js"
+>
+<TabPanel id="js" label="JavaScript">
+
+```js
+let { session, error } = await supabase.auth.verifyOTP({
+  phone: '+13334445555',
+  token: '123456',
+  type: 'sms',
+})
+```
+
+</TabPanel>
+<TabPanel id="http" label="HTTP">
+
+```bash
+curl -X POST 'https://cvwawazfelidkloqmbma.supabase.co/auth/v1/verify' \
+-H "apikey: SUPABASE_KEY" \
+-H "Content-Type: application/json" \
+-d '{
+  "type": "sms",
+  "phone": "+13334445555",
+  "token": "123456"
+}'
+```
+
+</TabPanel>
+</Tabs>
+
+如果成功的话，用户现在将被登录，你应该收到一个有效的会话，如。
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNjI3MjkxNTc3LCJzdWIiOiJmYTA2NTQ1Zi1kYmI1LTQxY2EtYjk1NC1kOGUyOTg4YzcxOTEiLCJlbWFpbCI6IiIsInBob25lIjoiNjU4NzUyMjAyOSIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6InBob25lIn0sInVzZXJfbWV0YWRhdGEiOnt9LCJyb2xlIjoiYXV0aGVudGljYXRlZCJ9.1BqRi0NbS_yr1f6hnr4q3s1ylMR3c1vkiJ4e_N55dhM",
+  "token_type": "bearer",
+  "expires_in": 3600,
+  "refresh_token": "LSp8LglPPvf0DxGMSj-vaQ"
+}
+```
+
+访问令牌可以作为承载令牌在授权头中发送，用于supabase-js的任何CRUD操作。请参阅我们的[行级安全]指南（/docs/guides/auth#row-level-security），了解更多关于以用户为单位限制访问的信息。
+
+另外，现在手机已经被验证了，用户可以使用号码和密码登录，而不需要每次都验证他们的号码。
+
+<Tabs
+  scrollable
+  size="small"
+  type="underlined"
+  defaultActiveId="js"
+>
+<TabPanel id="js" label="JavaScript">
+
+```js
+let { user, error } = await supabase.auth.signInWithPassword({
+  phone: '+13334445555',
+  password: 'some-password',
+})
+```
+
+</TabPanel>
+<TabPanel id="http" label="HTTP">
+
+```bash
+curl -X POST 'https://cvwawazfelidkloqmbma.supabase.co/auth/v1/token?grant_type=password' \
+-H "apikey: SUPABASE_KEY" \
+-H "Content-Type: application/json" \
+-d '{
+  "phone": "+13334445555",
+  "password": "some-password"
+}'
+```
+
+</TabPanel>
+</Tabs>
+
+### 使用OTP作为无密码登录机制
+
+在这种情况下，你将授予你的用户登录他们的账户的能力，而不需要在他们的账户上设置密码，他们所要做的就是每次使用OTP来验证他们的手机。
+
+在javascript中，我们可以使用只有一个参数的`signIn`方法：`phone`。
+
+<Tabs
+  scrollable
+  size="small"
+  type="underlined"
+  defaultActiveId="js"
+>
+<TabPanel id="js" label="JavaScript">
+
+```js
+let { user, error } = await supabase.auth.signInWithOtp({
+  phone: '+13334445555',
+})
+```
+
+</TabPanel>
+<TabPanel id="http" label="HTTP">
+
+```bash
+curl -X POST 'https://cvwawazfelidkloqmbma.supabase.co/auth/v1/otp' \
+-H "apikey: SUPABASE_KEY" \
+-H "Content-Type: application/json" \
+-d '{
+  "phone": "+13334445555"
+}'
+```
+
+</TabPanel>
+</Tabs>
+
+第二步与上一节相同，你需要从用户那里收集6位数的密码，并与他们的电话号码一起传递给验证方法。
+
+<Tabs
+  scrollable
+  size="small"
+  type="underlined"
+  defaultActiveId="js"
+>
+<TabPanel id="js" label="JavaScript">
+
+```js
+let { session, error } = await supabase.auth.verifyOTP({
+  phone: '+13334445555',
+  token: '123456',
+  type: 'sms',
+})
+```
+
+</TabPanel>
+<TabPanel id="http" label="HTTP">
+
+```bash
+curl -X POST 'https://cvwawazfelidkloqmbma.supabase.co/auth/v1/verify' \
+-H "apikey: SUPABASE_KEY" \
+-H "Content-Type: application/json" \
+-d '{
+  "type": "sms",
+  "phone": "+13334445555",
+  "token": "123456"
+}'
+```
+
+</TabPanel>
+</Tabs>
+
+并且响应也应与上述相同。
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNjI3MjkxNTc3LCJzdWIiOiJmYTA2NTQ1Zi1kYmI1LTQxY2EtYjk1NC1kOGUyOTg4YzcxOTEiLCJlbWFpbCI6IiIsInBob25lIjoiNjU4NzUyMjAyOSIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6InBob25lIn0sInVzZXJfbWV0YWRhdGEiOnt9LCJyb2xlIjoiYXV0aGVudGljYXRlZCJ9.1BqRi0NbS_yr1f6hnr4q3s1ylMR3c1vkiJ4e_N55dhM",
+  "token_type": "bearer",
+  "expires_in": 3600,
+  "refresh_token": "LSp8LglPPvf0DxGMSj-vaQ"
+}
+```
+
+用户没有密码，因此每次要访问你的服务时，都需要通过这种方法登录。
+
+## 资源
+
+- [Twilio Signup](https://www.twilio.com/try-twilio)
+- [Supabase仪表板](https://app.supabase.com)
+- [Supabase行级安全](/docs/guides/auth#row-level-security)
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

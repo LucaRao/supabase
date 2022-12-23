@@ -1,0 +1,663 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'stytch',
+  title: 'Stytch',
+  description:
+    "建立一个由Stytch的无密码认证和Supabase的行级安全（RLS）支持的Next.js应用程序。",
+}
+
+在本指南中，我们将使用Stytch、Supabase和Next.js构建一个简单的费用追踪网络应用。
+
+[Stytch]（https://stytch.com?utm_source=supabase&utm_medium=guide）为无密码认证提供了一个一体化的平台。Stytch使你能够轻松地将无密码解决方案嵌入你的网站和应用程序，以获得更好的安全性、更好的转换率和更好的终端用户体验。他们易于使用的SDK和直接API访问允许最大限度地控制和定制。在这个例子中，我们将使用[Email magic links](https://stytch.com/products/email-magic-links?utm_source=supabase&utm_medium=guide)来创建和登录我们的用户，以及会话管理。还有一个额外的可选步骤是启用[Google One Tap](https://stytch.com/blog/improving-conversion-with-google-one-tap?utm_source=supabase&utm_medium=guide)，这是一个转化率特别高的Google OAuth注册和登录流程。
+
+我们将利用Supabase来存储和授权对用户数据的访问。Supabase使设置行级安全（RLS）策略变得简单，确保用户只能读取和写入他们被授权的数据。如果你还没有一个Supabase账户，你需要创建一个。
+
+本指南将使用[Next.js](https://nextjs.org/)，这是一个建立在React之上的Web应用框架。Stytch提供了一个[Node.js库](https://github.com/stytchauth/stytch-node)和一个[React库](https://github.com/stytchauth/stytch-react)，使构建Next.js应用程序变得超级简单。
+
+> 注意：你可以在[Github](https://github.com/stytchauth/stytch-nextjs-supabase)上找到这个项目的完整版本。
+
+## 第0步：创建一个Stytch账户
+
+如果你已经有一个Stytch账户，你可以跳过这一步。
+
+进入[Stytch](https://stytch.com?utm_source=supabase&utm_medium=guide)，创建一个账户。请注意，Stytch提供了两种创建账户的方式，一是通过谷歌OAuth，二是通过电子邮件魔法链接。  这也是我们在本指南中要建立的用户体验!
+
+![Stytch redirect URL settings](/docs/img/guides/integrations/stytch/01.png)
+
+## 第一步：设置Stytch重定向URLs
+
+首先，我们需要添加将在电子邮件魔法链接流程中使用的重定向URL。这一步有助于确保坏人无法欺骗你的魔法链接和劫持重定向。
+
+在Stytch仪表板上浏览您的[重定向URL设置](https://stytch.com/dashboard/redirect-urls?utm_source=supabase&utm_medium=guide)，在**测试环境下**创建一个条目，其中**URL**为`http://localhost:3000/api/authenticate`，**Type**为`All`。
+
+![Edit Stytch redirect URL settings](/docs/img/guides/integrations/stytch/02.png)
+
+按**确认**后，重定向URLs仪表板将更新显示你的新条目。我们以后将使用这个URL。
+
+![Stytch redirect URL settings](/docs/img/guides/integrations/stytch/03.png)
+
+## 第2步：创建一个Supabase项目
+
+在您的[Supabase 仪表板](https://app.supabase.com/)上，单击**新项目**。
+
+为您的Supabase项目输入一个`名称`。
+
+输入一个安全的 `数据库密码`。
+
+单击**创建新项目**。您的项目可能需要几分钟的时间来配置。
+
+![New Supabase project settings](/docs/img/guides/integrations/stytch/04.png)
+
+## Step 3: 在Supabase中创建数据
+
+一旦你的Supabase项目被提供了，点击表编辑器，然后是新表。此工具可从 [Supabase 仪表板] (https://app.supabase.com/) 的侧边栏菜单中获得。
+
+输入 `expenses`作为**名称**字段。
+
+选择 `启用行级安全（RLS）`。
+
+添加三个新列。
+
+- `user_id` 为 `text`
+
+- `title` 为 `text`
+
+- `value` 为 `float8`
+
+点击**保存**来创建新的表格。
+
+![Creating a new table](/docs/img/guides/integrations/stytch/05.png)
+
+在表编辑器视图中，选择支出表并点击**插入行**。
+
+填写标题和数值字段（暂时将user_id留空），然后点击**保存**。
+
+![Creating a new row](/docs/img/guides/integrations/stytch/06.png)
+
+使用**插入行**来进一步将费用填充到表中。
+
+![Multiple rows](/docs/img/guides/integrations/stytch/07.png)
+
+## Step 4: 构建一个Next.js应用程序
+
+使用终端，创建一个新的Next.js项目。
+
+```bash
+npx create-next-app stytch-supabase-example
+```
+
+接下来，在`stytch-supabase-example`中创建一个`.env.local`文件并输入以下值。
+
+```
+STYTCH_PROJECT_ENV=test
+STYTCH_PROJECT_ID=GET_FROM_STYTCH_DASHBOARD
+STYTCH_PUBLIC_TOKEN=GET_FROM_STYTCH_DASHBOARD
+STYTCH_SECRET=GET_FROM_STYTCH_DASHBOARD
+NEXT_PUBLIC_SUPABASE_URL=GET_FROM_SUPABASE_DASHBOARD
+NEXT_PUBLIC_SUPABASE_KEY=GET_FROM_SUPABASE_DASHBOARD
+SUPABASE_SIGNING_SECRET=GET_FROM_SUPABASE_DASHBOARD
+```
+
+> 注意：Stytch值可以在项目[dashboard](https://stytch.com/dashboard/api-keys?utm_source=supabase&utm_medium=guide)的**API Keys**下找到。
+
+![Stytch API keys](/docs/img/guides/integrations/stytch/08.png)
+
+> 注意：Supabase值可以在你的项目的**设置** > **API**下找到。
+
+![Supabase API keys](/docs/img/guides/integrations/stytch/09.png)
+
+启动你的Next.js开发服务器，从`.env.local`中读入新的值。
+
+```bash
+npm run dev
+```
+
+你应该在`localhost:3000`上有一个正在运行的Next.js应用程序。
+
+## Step 5: Build the Login Form
+
+现在我们将用一个登录界面来替换默认的Next.js主页。我们将使用Stytch React库。
+
+> 注意：Stytch为那些想自己建立登录界面的人提供了直接的API访问。
+
+安装`@stytch/stytch-react`库。
+
+```bash
+npm install @stytch/stytch-react
+```
+
+在根目录下，创建一个名为 `components`的新文件夹，并在该文件夹中创建名为 "StytchLogin.js "的文件。在这个文件中，粘贴下面的片段。这将配置和设计Stytch React组件，使其使用电子邮件魔法链接。
+
+```jsx
+// components/StytchLogin.js
+import React from 'react'
+import { Stytch } from '@stytch/stytch-react'
+
+const stytchConfig = {
+  loginOrSignupView: {
+    products: ['emailMagicLinks'],
+    emailMagicLinksOptions: {
+      loginRedirectURL: 'http://localhost:3000/api/authenticate',
+      loginExpirationMinutes: 30,
+      signupRedirectURL: 'http://localhost:3000/api/authenticate',
+      signupExpirationMinutes: 30,
+      createUserAsPending: true,
+    },
+  },
+  style: {
+    fontFamily: '"Helvetica New", Helvetica, sans-serif',
+    width: '321px',
+    primaryColor: '#0577CA',
+  },
+}
+
+const StytchLogin = ({ publicToken }) => {
+  return (
+    <Stytch
+      publicToken={publicToken}
+      loginOrSignupView={stytchConfig.loginOrSignupView}
+      style={stytchConfig.style}
+    />
+  )
+}
+
+export default StytchLogin
+```
+
+此外，通过在`/components`中创建一个名为`Profile.js`的文件来创建一个配置文件组件。稍后我们将使用这个组件来呈现我们存储在Supabase中的费用。
+
+```jsx
+// components/Profile.js
+import React from 'react'
+import Link from 'next/link'
+
+export default function Profile({ user }) {
+  return (
+    <div>
+      <h1>Welcome {user.userId}</h1>
+      <h2>Your expenses</h2>
+      {user.expenses?.length > 0 ? (
+        user.expenses.map((expense) => (
+          <p key={expense.id}>
+            {expense.title}: ${expense.value}
+          </p>
+        ))
+      ) : (
+        <p>You have no expenses!</p>
+      )}
+
+      <Link href="/api/logout" passHref>
+        <button>
+          <a>Logout</a>
+        </button>
+      </Link>
+    </div>
+  )
+}
+```
+
+最后，替换文件`/pages/index.js`的内容来呈现我们新的`StytchLogin`和`Profile`组件。
+
+```jsx
+// pages/index.js
+import styles from '../styles/Home.module.css'
+import Profile from '../components/Profile'
+import StytchLogin from '../components/StytchLogin'
+
+const Index = ({ user, publicToken }) => {
+  let content
+  if (user) {
+    content = <Profile user={user} />
+  } else {
+    content = <StytchLogin publicToken={publicToken} />
+  }
+
+  return <div className={styles.main}>{content}</div>
+}
+
+export async function getServerSideProps({ req, res }) {
+  const user = null // Will update later
+  return {
+    props: { user, publicToken: process.env.STYTCH_PUBLIC_TOKEN },
+  }
+}
+
+export default Index
+```
+
+在`localhost:3000`，现在有一个登录表格，提示你的电子邮件地址。
+
+![Email login step one](/docs/img/guides/integrations/stytch/10.png)
+
+输入你的电子邮件地址并按**继续使用电子邮件**。
+
+![Email login step two](/docs/img/guides/integrations/stytch/11.png)
+
+在你的收件箱中，你会发现一个来自你的应用程序的登录请求。
+
+![Email login step three](/docs/img/guides/integrations/stytch/12.png)
+
+然而，如果你点击邮件中的链接，你会得到一个404。我们需要建立一个API路由来处理电子邮件中的神奇链接认证。
+
+## 第6步：认证并开始一个会话
+
+为了使认证更容易，我们将使用Stytch Node.js库。运行
+
+```bash
+npm install stytch
+```
+
+此外，我们将需要在一个cookie中存储认证的会话。运行
+
+```bash
+npm install cookies-next
+```
+
+创建一个名为`utils`的新文件夹，里面有一个名为`stytchLogic.js`的文件，内容如下
+
+```jsx
+// utils/stytchLogic.js
+import * as stytch from 'stytch'
+import { getCookie, setCookies, removeCookies } from 'cookies-next'
+
+export const SESSION_COOKIE = 'stytch_cookie'
+
+let client
+const loadStytch = () => {
+  if (!client) {
+    client = new stytch.Client({
+      project_id: process.env.STYTCH_PROJECT_ID,
+      secret: process.env.STYTCH_SECRET,
+      env: process.env.STYTCH_PROJECT_ENV === 'live' ? stytch.envs.live : stytch.envs.test,
+    })
+  }
+
+  return client
+}
+
+export const getAuthenticatedUserFromSession = async (req, res) => {
+  const sessionToken = getCookie(SESSION_COOKIE, { req, res })
+  if (!sessionToken) {
+    return null
+  }
+
+  try {
+    const stytchClient = loadStytch()
+    const resp = await stytchClient.sessions.authenticate({
+      session_token: sessionToken,
+    })
+    return resp.session.user_id
+  } catch (error) {
+    console.log(error)
+    return null
+  }
+}
+
+export const revokeAndClearSession = async (req, res) => {
+  const sessionToken = getCookie(SESSION_COOKIE, { req, res })
+
+  if (sessionToken) {
+    try {
+      const stytchClient = loadStytch()
+      await stytchClient.sessions.revoke({
+        session_token: sessionToken,
+      })
+    } catch (error) {
+      console.log(error)
+    }
+    removeCookies(SESSION_COOKIE, { req, res })
+  }
+
+  return res.redirect('/')
+}
+
+export const authenticateTokenStartSession = async (req, res) => {
+  const { token, type } = req.query
+  let sessionToken
+  try {
+    const stytchClient = loadStytch()
+    const resp = await stytchClient.magicLinks.authenticate(token, {
+      session_duration_minutes: 30,
+    })
+    sessionToken = resp.session_token
+  } catch (error) {
+    console.log(error)
+    const errorString = JSON.stringify(error)
+    return res.status(400).json({ errorString })
+  }
+
+  setCookies(SESSION_COOKIE, sessionToken, {
+    req,
+    res,
+    maxAge: 60 * 60 * 24,
+    secure: true,
+  })
+
+  return res.redirect('/')
+}
+```
+
+这个逻辑负责设置我们将用来调用API的Stytch客户端。它提供了我们将用于登录、注销和验证用户会话的功能。
+
+为了完成电子邮件登录流程，创建一个新的文件`pages/api/authenticate.js`，内容如下。
+
+```jsx
+// pages/api/authenticate.js
+import { authenticateTokenStartSession } from '../../utils/stytchLogic'
+
+export default async function handler(req, res) {
+  return authenticateTokenStartSession(req, res)
+}
+```
+
+我们还将创建一个具有类似内容的logout API端点。在`pages/api/logout.js`中包括以下内容。
+
+```jsx
+// pages/api/logout.js
+import { revokeAndClearSession } from '../../utils/stytchLogic'
+
+export default async function handler(req, res) {
+  return revokeAndClearSession(req, res)
+}
+```
+
+最后，更新`pages/index.js`，导入`getAuthenticatedUserFromSession`，并调用它来设置`getServerSideProps`中的用户变量。
+
+```jsx
+// pages/index.js
+import styles from '../styles/Home.module.css'
+
+import StytchLogin from '../components/StytchLogin'
+import Profile from '../components/Profile'
+import { getAuthenticatedUserFromSession } from '../utils/stytchLogic'
+
+const Index = ({ user, publicToken }) => {
+  let content
+  if (user) {
+    content = <Profile user={user} />
+  } else {
+    content = <StytchLogin publicToken={publicToken} />
+  }
+
+  return <div className={styles.main}>{content}</div>
+}
+
+export async function getServerSideProps({ req, res }) {
+  const userId = await getAuthenticatedUserFromSession(req, res)
+  if (userId) {
+    return {
+      props: { user: { userId }, publicToken: process.env.STYTCH_PUBLIC_TOKEN },
+    }
+  }
+  return {
+    props: { publicToken: process.env.STYTCH_PUBLIC_TOKEN },
+  }
+}
+
+export default Index
+```
+
+返回到`localhost:3000`，通过发送新的电子邮件再次登录。在点击邮件后，你应该看到 `欢迎$USER_ID`。如果你刷新页面，你应该保持在一个认证状态。如果你按下**Logout**，那么你应该返回到登录界面。
+
+![Profile page](/docs/img/guides/integrations/stytch/13.png)
+
+现在我们有了一个带有持久性认证的工作登录流程，是时候从Supabase中提取我们的费用数据了。
+
+## 第七步：从Supabase请求用户数据
+
+首先，安装Supabase客户端。
+
+```bash
+npm install @supabase/supabase-js
+```
+
+为了向Supabase传递认证的`user_id`，我们将把它打包在JWT中。安装jsonwebtoken。
+
+```bash
+npm install jsonwebtoken
+```
+
+创建一个新文件`utils/supabase.js`并添加以下内容。
+
+```jsx
+// utils/supabase.js
+import { createClient } from '@supabase/supabase-js'
+import jwt from 'jsonwebtoken'
+
+const getSupabase = (userId) => {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_KEY
+  )
+
+  if (userId) {
+    const payload = {
+      userId,
+      exp: Math.floor(Date.now() / 1000) + 60 * 60,
+    }
+
+    supabase.auth.session = () => ({
+      access_token: jwt.sign(payload, process.env.SUPABASE_SIGNING_SECRET),
+    })
+  }
+
+  return supabase
+}
+
+export { getSupabase }
+```
+
+我们的JWT有效载荷将包含来自Stytch的用户的唯一标识，即他们的`user_id`。我们使用Supabase的签名秘密来签署这个JWT，所以Supabase将能够验证它是真实的，在运输过程中没有被篡改。
+
+让我们在主页上从Supabase加载我们的费用吧 最后一次更新`pages/index.js`，向Supabase请求费用数据。
+
+```jsx
+import styles from '../styles/Home.module.css'
+
+import StytchLogin from '../components/StytchLogin'
+import Profile from '../components/Profile'
+import { getAuthenticatedUserFromSession } from '../utils/stytchLogic'
+import { getSupabase } from '../utils/supabase'
+
+const Index = ({ user, publicToken }) => {
+  let content
+  if (user) {
+    content = <Profile user={user} />
+  } else {
+    content = <StytchLogin publicToken={publicToken} />
+  }
+
+  return <div className={styles.main}>{content}</div>
+}
+
+export async function getServerSideProps({ req, res }) {
+  const userId = await getAuthenticatedUserFromSession(req, res)
+
+  if (userId) {
+    const supabase = getSupabase(userId)
+    const { data: expenses } = await supabase.from('expenses').select('*')
+
+    return {
+      props: {
+        user: { userId, expenses },
+        publicToken: process.env.STYTCH_PUBLIC_TOKEN,
+      },
+    }
+  } else {
+    return {
+      props: { publicToken: process.env.STYTCH_PUBLIC_TOKEN },
+    }
+  }
+}
+
+export default Index
+```
+
+当我们重新加载我们的应用程序时，我们仍然得到费用的空状态。
+
+这是因为我们启用了行级安全（Row Level Security），它默认阻止所有的请求，让你细化控制对数据库中数据的访问。为了使我们的用户能够选择他们的费用，我们需要写一个RLS策略。
+
+## 第8步：写一个策略来允许选择
+
+我们的策略需要知道我们当前登录的用户是谁，以确定他们是否应该有访问权。让我们创建一个PostgreSQL函数，从我们的新JWT中提取当前用户。
+
+回到Supabase仪表板，从侧边栏菜单中选择SQL，然后点击**新查询**。这将创建一个新的查询，这将允许我们对我们的Postgres数据库运行任何SQL。
+
+写下以下内容并点击**运行**。
+
+```sql
+create or replace function auth.user_id() returns text as $$
+ select nullif(current_setting('request.jwt.claims', true)::json->>'userId', '')::text;
+$$ language sql stable;
+```
+
+你应该看到输出`成功，没有行返回`。这创建了一个叫做`auth.user_id()`的函数，它将检查我们JWT有效载荷的`userId`字段。
+
+> 注意：要了解更多关于PostgreSQL函数的信息，请看这个[深入研究视频](https://www.youtube.com/watch?v=MJZCCpCYEqk)。
+
+让我们创建一个策略，检查这个用户是否是一项开支的所有者。
+
+从Supabase侧边栏菜单中选择**认证**，点击**政策**，然后点击**新政策**。
+
+![Supabase authentication page](/docs/img/guides/integrations/stytch/14.png)
+
+在模式中，选择**为完全定制，从头开始创建一个政策**，并添加以下内容。
+
+![Supabase create policy page](/docs/img/guides/integrations/stytch/15.png)
+
+这个策略正在调用我们刚刚创建的函数，以获得当前登录用户的`user_id``auth.user_id()`，并检查这是否与当前费用的`user_id`列相匹配。如果吻合，那么它将允许用户选择，否则将继续拒绝。
+
+点击审查，然后保存策略。保存后，点击表中的启用RLS，启用我们刚刚创建的策略。
+
+> 注意：要了解更多关于RLS和政策的信息，请查看这个[视频](https://www.youtube.com/watch?v=Ow_Uzedfohk)。
+
+我们需要做的最后一件事是为我们现有的费用更新`user_id`列。
+
+回到Supabase仪表板，从侧边栏中选择表编辑器。你会注意到每个条目的`user_id`设置为`NULL`。我们需要把这个值更新为适当的`user_id`。
+
+![Supabase null users in table](/docs/img/guides/integrations/stytch/16.png)
+
+要获得Stytch用户的`user_id`，你可以从我们的示例应用程序的欢迎页面中提取（例如`user-test-61497d40-f957-45cd-a6c8-5408d22e93bc`）。
+
+![Get user_id](/docs/img/guides/integrations/stytch/17.png)
+
+将Supabase中的每一行更新为这个`user_id`。
+
+![Populate user_id](/docs/img/guides/integrations/stytch/18.png)
+
+返回到`localhost:3000`，你会看到你的费用被列出。
+
+![Listed expenses](/docs/img/guides/integrations/stytch/19.png)
+
+我们现在有了一个由Stytch、Supabase和Next.js驱动的基本费用追踪应用程序。从这里，你可以添加额外的功能，如添加、编辑和进一步组织你的费用。
+
+> 注意：你可以在[Github](https://github.com/stytchauth/stytch-nextjs-supabase)上找到这个项目的完整版本。
+
+## 可选。添加谷歌一键通
+
+在这个可选的步骤中，我们将扩展我们的应用程序，以允许用户在电子邮件魔法链接之外用Google One Tap登录。
+
+你需要按照[本指南](https://stytch.com/docs/one-tap-guide?utm_source=supabase&utm_medium=guide)的前四个步骤来创建一个谷歌项目，设置谷歌OAuth同意，并配置凭证和重定向URLs。
+
+首先，我们将对`StytchLogin`组件做一些调整。我们将更新配置，使其同时使用Google OAuth和Email魔法链接。
+
+```jsx
+// components/StytchLogin.js
+import React from 'react'
+import { Stytch } from '@stytch/stytch-react'
+
+const stytchConfig = {
+  loginOrSignupView: {
+    products: ['oauth', 'emailMagicLinks'],
+    oauthOptions: {
+      providers: [
+        {
+          type: 'google',
+          one_tap: true,
+          position: 'embedded',
+        },
+      ],
+      loginRedirectURL: 'http://localhost:3000/api/authenticate?type=oauth',
+      signupRedirectURL: 'http://localhost:3000/api/authenticate?type=oauth',
+    },
+    emailMagicLinksOptions: {
+      loginRedirectURL: 'http://localhost:3000/api/authenticate',
+      loginExpirationMinutes: 30,
+      signupRedirectURL: 'http://localhost:3000/api/authenticate',
+      signupExpirationMinutes: 30,
+      createUserAsPending: true,
+    },
+  },
+  style: {
+    fontFamily: '"Helvetica New", Helvetica, sans-serif',
+    width: '321px',
+    primaryColor: '#0577CA',
+  },
+}
+
+const StytchLogin = ({ publicToken }) => {
+  return (
+    <Stytch
+      publicToken={publicToken}
+      loginOrSignupView={stytchConfig.loginOrSignupView}
+      style={stytchConfig.style}
+    />
+  )
+}
+
+export default StytchLogin
+```
+
+我们还需要对`stytchLogic.js`中的`authenticateTokenStartSession`函数做一个调整。Stytch有独立的认证端点，用于Email magic links和OAuth，所以我们需要正确地路由我们的token。
+
+```jsx
+// utils/stytchLogic.js
+
+// leave the rest of the file contents as is
+export const authenticateTokenStartSession = async (req, res) => {
+  const { token, type } = req.query
+  let sessionToken
+  try {
+    const stytchClient = loadStytch()
+    if (type == 'oauth') {
+      const resp = await stytchClient.oauth.authenticate(token, {
+        session_duration_minutes: 30,
+        session_management_type: 'stytch',
+      })
+      sessionToken = resp.session.stytch_session.session_token
+    } else {
+      const resp = await stytchClient.magicLinks.authenticate(token, {
+        session_duration_minutes: 30,
+      })
+      sessionToken = resp.session_token
+    }
+  } catch (error) {
+    console.log(error)
+    const errorString = JSON.stringify(error)
+    return res.status(400).json({ errorString })
+  }
+
+  setCookies(SESSION_COOKIE, sessionToken, {
+    req,
+    res,
+    maxAge: 60 * 60 * 24,
+    secure: true,
+  })
+
+  return res.redirect('/')
+}
+```
+
+有了这两个变化，你现在将有一个有效的Google One Tap认证方法，以及电子邮件魔法链接。
+
+![Google One Tap](/docs/img/guides/integrations/stytch/20.png)
+
+## 资源
+
+- [Stytch博客](https://stytch.com/blog?utm_source=supabase&utm_medium=guide)
+- [Stytch文档](https://stytch.com/docs?utm_source=supabase&utm_medium=guide)
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

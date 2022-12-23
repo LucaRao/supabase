@@ -1,0 +1,94 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'custom-domains',
+  title: '自定义域名',
+  description: '为你的Supabase项目配置一个自定义域。',
+}
+
+<Admonition type="note">
+
+自定义域名目前处于测试阶段，正在慢慢向项目提供。
+
+</Admonition>
+
+自定义域名允许你向你的用户展示一个品牌的体验。为了本指南的目的，你也可以使用一个子域。
+
+准备
+
+1. [安装](/docs/guides/cli) Supabase CLI 1.11.3+。
+1. 使用 CLI [登录](/docs/guides/cli/local-development#log-in-the-supabase-cli) 到您的 Supabase 账户。
+1. 确保你对你想设置自定义域的项目有[所有者或管理员权限](/docs/guides/hosting/platform#manage-team-members)。
+1. 在仪表板的计费页面中启用自定义域名插件。
+
+## 配置一个自定义域
+
+这个例子假设你的Supabase项目是 `foobar`，对应的API URL是 `foobarbaz.supabase.co`，并在 `api.example.com`配置了一个自定义域名。
+
+### 配置一个CNAME
+
+为`api.example.com`设置一个CNAME记录，解析到`foobarbaz.supabase.co.`，TTL越低越好。
+
+### 配置TXT验证
+
+使用CLI的`create`子命令来通知Supabase你的域名并检索TXT验证记录。
+
+```bash
+supabase domains create --project-ref foobar --custom-hostname api.example.com --experimental
+```
+
+创建命令的输出包括两个TXT记录[^1]，你将需要设置，以验证你对该域名的控制。
+并让我们为其颁发SSL证书。比如说。
+
+```bash
+[...]
+Required outstanding validation records:
+        _cf-custom-hostname.api.example.com TXT -> 46BBC14D-D50A-409C-8DB5-F862CF5BA660
+        api.example.com TXT -> ca3-F1HvR9i938OgVwpCFwi1jTsbhe1hvT0Ic3efPY3Q
+```
+
+[^1] 其中一条记录要求你用一条TXT记录_取代[第一步](#cname-configure)中设置的CNAME记录。在验证过程完成后，你就可以把它恢复到CNAME。
+
+### 验证你的域名
+
+按照指示设置两个记录，然后使用Supabase平台的`reverify`命令来验证这些记录。
+
+```bash
+supabase domains reverify --project-ref foobarbaz --experimental
+```
+
+你可能需要等待几分钟，你的更新的DNS记录才会被传播，特别是如果旧的记录使用高TTL的话。
+
+### 激活你的域名
+
+最后的激活步骤是重新配置你的项目，开始为你的自定义域名（`api.example.com`）提供流量。
+特别是授权服务，将不再使用原来的URL（`foobar.supabase.co`）。
+因此，建议你安排20-30分钟的停机时间，这取决于你的项目的复杂性，以更新所有需要了解你的自定义域名的服务。
+
+- 任何客户端代码（例如前台、移动应用程序）。
+- 任何OAuth提供商（如谷歌、Github）。
+
+此外，更新`api.example.com`的DNS配置，再次使用CNAME记录，解析到`foobarbaz.supabase.co`。
+最后，你可以使用`activate`子命令来重新配置你的项目。
+
+```bash
+supabase domains activate --project-ref foobarbaz --experimental
+```
+
+## 删除一个自定义域
+
+如果你为你的Supabase项目设置了一个自定义域（`api.example.com`）（参考`foobarbaz`，分配的端点在`foobarbaz.supabase.co`），并且想回到使用Supabase提供的端点（`foobarbaz.supabase.co`），你可以使用`delete`子命令。
+
+```bash
+supabase domains delete --project-ref foobarbaz --experimental
+```
+
+与设置自定义域的过程的最后激活阶段一样，你需要更新你的客户代码和OAuth提供商中的任何引用，从自定义域到Supabase提供的端点。
+
+## 局限性
+
+边缘函数不尊重自定义域的设置，它们仍然必须通过`foobarbaz.supabase.co`域来调用。
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

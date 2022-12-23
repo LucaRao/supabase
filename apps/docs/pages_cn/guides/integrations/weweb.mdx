@@ -1,0 +1,341 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'weweb',
+  title: 'WeWeb',
+  description: '在现有数据库的基础上建立用户界面。',
+}
+
+本指南解释了如何将Supabase后端连接到WeWeb前端，然后配置所有必要的CRUD操作，以建立一个具有用户认证、角色和权限的管理门户。
+
+[WeWeb](https://dashboard.weweb.io/sign-up)是一个低代码的前端构建器，将无代码的短暂学习曲线与代码的自由度结合起来。
+
+它通过两个本地集成连接到Supabase。
+
+- 一个用于数据操作，另一个
+- 另一个用于用户认证。
+
+如果你没有WeWeb账户，你可以创建一个[这里](https://dashboard.weweb.io/sign-up)。
+
+让我们开始吧!
+
+## 第1步：在WeWeb中添加Supabase数据源插件
+
+为了在WeWeb中读取Supabase数据，你首先需要添加Supabase数据源插件。
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-09-at-11.38.44@2x.png)
+
+一旦你添加了它，你将被邀请分享你的Supabase项目URL和公共API密钥。
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-09-at-11.39.33@2x.png)
+
+在Supabase中，你可以在 `设置`>`API`菜单中找到你的项目URL和公钥。
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-09-at-11.45.46@2x.png)
+
+一旦你把两者都添加到WeWeb中，如果你愿意，你将可以选择启用实时表。
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-18-at-12.22.43@2x.png)
+
+**🚨 警告 🚨**
+
+> 为了提高数据库的性能和安全性，Supabase中默认禁用实时功能。在我们的文档中了解更多关于[Realtime](https://supabase.com/docs/guides/database#realtime)的信息。
+> 会员
+> @awalias awalias 16 天前
+> 可能只是想把这些改成相对的，但其他方面看起来不错👍
+
+@EWMAs Reply...
+
+## 第2步：从Supabase获取数据
+
+一旦你点击 "添加一个集合"，你将被邀请给你的集合一个名称，并选择Supabase作为数据源。
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-09-at-11.55.15@2x.png)
+
+然后，你将能够选择你想从中提取数据的表。
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-09-at-11.57.09.gif)
+
+请注意，这使你可以用两种不同的模式来访问表中的字段。
+
+1. "Guided"模式，和
+2. "Advanced"模式。
+
+### Guided模式
+
+默认情况下，"Guided"模式返回所有字段的数据。
+
+在下面的例子中，我们决定排除`vehicles`表中的`created_at`字段的数据。
+
+_![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-09-at-12.04.37@2x.png)_
+
+因此，WeWeb不会获取`created_at`字段。
+
+这很有帮助，因为我们可以排除那些我们不想在前台加载的数据，因为我们不需要它，或者因为它是机密。
+
+### Advanced模式
+
+在我们的数据库中，我们为车辆和地点创建了2个独立的表。
+
+在`vehicles`表中，我们在`location_id`字段中对`locations`表做了一个引用，这样我们就知道每辆车的位置。
+
+_![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-09-at-12.30.20@2x.png)_
+
+问题是，该链接只给我们在`locations`表中的位置的id。
+
+如果你选择 `Advanced`模式，你将能够获得位置的 `name`字段，而不是 `ID`。
+
+如何获得？
+
+通过[对Supabase进行自定义查询]（https://supabase.com/docs/reference/javascript/select）。
+
+_![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-18-at-12.06.17.gif)_
+
+在上面的例子中，我们要告诉Supabase。
+
+- 从集合中选择的表--在这个例子中是`vehicles`表--请给我发送`id`、`model`和`mileage`字段中的数据
+- 在`locations`表中寻找`vehicles`表中的`location_id`，并将相应的`name`字段中的数据发送给我。
+
+如果我们只要求从`vehicles`表中的`location`字段获取数据，Supabase将只返回`id`。
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-09-at-12.39.12@2x.png)
+
+**🚨 警告 🚨**
+
+> 如果你在 Supabase 中启用了行级安全，请确保你也[添加了一个策略](https://supabase.com/docs/learn/auth-deep-dive/auth-policies)，允许用户读取表中的数据。否则，WeWeb将无法获得这些数据。
+
+## 第三步：在WeWeb中显示Supabase数据
+
+假设你能够在WeWeb集合中从Supabase中获取数据，你就能够在你的WeWeb页面上绑定该集合的数据。
+
+在下面的例子中，我们选择在WeWeb中开箱即用的[数据网格元素](https://docs.weweb.io/data-grid/)中显示汽车模型和里程数。
+
+![](https://weweb-changelog.ghost.io/content/images/2022/10/CleanShot-2022-10-21-at-12.31.05@2x.png)
+
+我们选择这个元素是因为它包括一个内置的内联编辑模式，我们将在以后的CRUD操作中使用。
+
+#### 🔥 专业小贴士 🔥
+
+> 在WeWeb中，你可以[将数据的数组绑定到任何容器](https://docs.weweb.io/display-collection-list/)。只要记住，你将集合绑定到的容器的第一个孩子将是重复的项目。考虑到这一点，你可能希望第一个子元素是另一个容器，里面有一些项目，如标题、描述、按钮或图片。
+
+## 第4步：更新Supabase中的一条记录
+
+一旦你在WeWeb上添加了一个Supabase的数据集合，你可能想让用户操作该集合中的数据。
+
+为了做到这一点，你需要在WeWeb中创建一个工作流。
+
+在下面的例子中，我们使用的是 `更新行`的工作流，它是WeWeb的数据网格元素所默认的。
+
+触发器是 ·在行更新时·。
+
+由于我们在上面添加了Supabase数据源插件，我们可以访问Supabase中的所有CRUD动作。
+
+- Select
+- Insert
+- Update
+- Upsert
+- Delete
+
+在这种情况下，我们选择 `更新`行动。
+
+![](https://weweb-changelog.ghost.io/content/images/2022/10/CleanShot-2022-10-13-at-15.27.20@2x.png)
+
+然后，在我们的 `更新`动作中，我们选择 "vehicles"表并将 `id`映射到工作流事件的id。
+
+![](https://weweb-changelog.ghost.io/content/images/2022/10/CleanShot-2022-10-13-at-17.16.51@2x.png)
+
+最后，我们告诉WeWeb，我们要更新Supabase表中的 `mileage`字段，并将该值发送到数据网格的 `mileage`列中。
+
+![](https://weweb-changelog.ghost.io/content/images/2022/10/CleanShot-2022-10-13-at-17.20.24@2x.png)
+
+
+如果你切换到预览模式，你将从WeWeb数据网格中更新你的Supabase表。
+
+![](https://weweb-changelog.ghost.io/content/images/2022/10/CleanShot-2022-10-13-at-17.35.20.gif)
+
+**🔥 专业的提示 🔥**
+
+> By default, the fields in the Data Grid Element are Text fields but you can change the input type to Number if you need to send numerical data to your database:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/10/CleanShot-2022-10-13-at-17.22.58@2x.png)
+
+## Restrict who can modify a record in Supabase
+
+By default, all the data in the tables that are in the `public` schema of your Supabase project can be read, updated, or deleted.
+
+Supabase allows you to [enable Row-Level Security](https://supabase.com/docs/learn/auth-deep-dive/auth-row-level-security) for each of your tables:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/10/CleanShot-2022-10-13-at-16.10.39@2x.png)
+
+If you want to restrict certain actions to specific users or roles, you'll need to:
+
+- add Supabase authentication to your WeWeb project, and
+- [write SQL policies in Supabase](https://supabase.com/docs/learn/auth-deep-dive/auth-policies).
+
+We provide a number of policy templates to get you started:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/10/CleanShot-2022-10-13-at-16.17.32@2x.png)
+
+In the example below, we say that users can:
+
+1.  update a record
+2.  in the "locations" table of the "public" schema
+3.  if they are authenticated
+
+![](https://weweb-changelog.ghost.io/content/images/2022/10/CleanShot-2022-10-13-at-16.19.28@2x.png)
+
+**🔥 Pro Tip 🔥**
+
+> Once you enable RLS on a Supabase table, you won't be able to access the data in a WeWeb Collection unless you've added a policy.
+
+![](https://weweb-changelog.ghost.io/content/images/2022/10/CleanShot-2022-10-13-at-16.28.51.gif)
+
+## Step 4: Add User Authentication
+
+Once you are able to display Supabase data in WeWeb, you might want to restrict access to certain users or display specific data based on a user's role.
+
+In order to do that, you'll need to add WeWeb's Supabase Auth Plugin.
+
+### Add Supabase Auth Plugin in WeWeb
+
+Supabase comes with an in-built authentication system which you can use in WeWeb.
+
+To add the Supabase Auth Plugin in WeWeb, go to `Plugins` > `Authentication`:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-09-at-15.00.47@2x.png)
+
+Assuming you have already provided your Supabase project URL and public API key when setting up the Supabase Data source, the only thing left to do will be to add your private API key:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-09-at-15.04.04@2x.png)
+
+In Supabase, you can find your private API key in `Settings` > `API`:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-09-at-15.05.40@2x.png)
+
+**🚨 Warning 🚨**
+
+> As the name suggests, you'll want to keep this API key secret! Assuming you copy it properly in the "Private API key" field of the Supabase Auth Plugin and don't use it anywhere else in your Weweb project, Weweb will never make it public.
+
+You will then be invited to choose a page to redirect _unauthenticated_ users, i.e. users who are NOT signed-in:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-09-at-15.17.43@2x.png)
+
+**🚨 Warning 🚨**
+
+> When you setup your Login Workflow, make sure you don't redirect unauthenticated users to a page that is only accessible to authenticated users. Otherwise, you'll be creating an **infinite loop** and your app will crash.
+
+### Create User Sign Up and Sign In Workflows
+
+In the `Add` > `UI kit` menu of WeWeb, you can find ready-made Sign in and Sign up Forms:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-19-at-11.45.02@2x.png)
+
+Once you've added a Form to the Canvas, you'll be able to style it whichever way you want.
+
+In the example below, we added an image with the logo of our project to a Sign up Form and changed the background color of the `Create Form` Container:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-19-at-11.49.24@2x.png)
+
+To allow users to sign up, you'll need to create a Sign up Workflow on the Form Container:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-19-at-11.50.42@2x.png)
+
+**🔥 Pro Tip 🔥**
+
+> It's important that the Workflow is on the Form Container and not the Sign up Button because we want to validate the fields of the Form when users submit it.
+
+In the Workflow, you will choose the `On submit` trigger and add the Supabase `Sign up` Action:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-19-at-11.58.23.gif)
+
+Then, you'll want to map the email, password, and metadata information in the Form to the email, password, and metadata in Supabase before choosing what page the new user should be redirected to:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-19-at-12.02.32.gif)
+
+In the example above, we made sure to add the user's name as an item in that user's metadata.
+
+In Supabase, you can find the user's metadata in JSON format in a dedicated field of the `users` table, named `raw_user_meta_data`:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-19-at-12.12.46@2x.png)
+
+The same logic will apply to any Supabase Action you want to trigger.
+
+## Adding User Roles & Permissions
+
+Now let's say we want to gate content and set different permissions based on a user's role.
+
+### Adding Roles in Supabase
+
+In Supabase, we'll need to create a `roles` table with a list of roles and a join table that links the `roles` table with our `users` table.
+
+First, let's create a `roles` table with three roles and make sure that each role had a UUID and a `name`:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-19-at-18.39.08@2x.png)
+
+**🚨 Warning 🚨**
+
+> In order for the integration to work with the Users tab in WeWeb, it is crucial that the role title is a text field named `name`.
+
+### Joining Roles and Users in Supabase
+
+Second, let's create a `userRoles` join table:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-19-at-18.45.10@2x.png)
+
+In the join table above, you can see we have an `id` field that is uniquely identifiable thanks to a UUID.
+
+This unique `id` is linked to a `userId`, which is also a UUID, more specifically, it is the UUID we find in the `id` field of the `users` table in the `auth` schema:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-19-at-18.51.00@2x.png)
+
+Each row in our `userRoles` table is also linked to a `roleId` which is the UUID we find in the `id` field of the `roles` table in the `public` schema:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-19-at-18.52.57.gif)
+
+### Linking Users in WeWeb to Roles and Users in Supabase
+
+Once we've added our list of roles in Supabase and created an empty join table to link our roles with users, it's time to go to WeWeb.
+
+In `Plugins` > `Supabase Auth` > `3. Roles table`, we'll click `refresh` and select the relevant Supabase tables we just created:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-19-at-19.00.54@2x.png)
+
+Once you've told WeWeb where to find the `roles` and the join table in Supabase, you'll be able to easily view and maintain user roles in the `Users` tab in WeWeb:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-19-at-19.03.13.gif)
+
+When you make a change to a User in WeWeb, it will automatically be updated in Supabase.
+
+## Users vs Profiles
+
+So far, we've showed you how to work with the default `users` table that Supabase generates in the `auth` schema when you create a new project.
+
+Note that, for security purposes, the information in that `users` table is not exposed on the auto-generated API.
+
+How does this affect your project in WeWeb?
+
+### Let users update their information
+
+Let's say you want to let authenticated users update their information, then you don't need to set up anything else in Supabase.
+
+You could simply create a user profile page in WeWeb and display their information when they sign in, based on the data you have in the `user` Variable:
+
+![](https://weweb-changelog.ghost.io/content/images/2022/08/CleanShot-2022-08-19-at-19.16.17@2x.png)
+
+### Display other users' information
+
+In some use cases, you might want to display _other_ users' information.
+
+For example, if you're building an HR portal in WeWeb, you might want HR employees to have access to a list of applicants and their user profiles.
+
+You wouldn't be able to do that with the `users` table in the `auth` schema because each user's information is only available to them.
+
+For such a use case, we recommend creating a `profiles` table in the `public` schema to store user data that you want to access via the API.
+
+In WeWeb, you would then be able to create a Collection to get data from the `profiles` table.
+
+Learn more about [managing user data in Supabase](https://supabase.com/docs/guides/auth/managing-user-data).
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

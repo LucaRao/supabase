@@ -1,0 +1,367 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'row-level-security',
+  title: '行级别安全性',
+  description: '使用Postgres行级安全保护您的数据。',
+}
+
+当您需要细粒度的授权规则时，没有什么比PostgreSQL的[Row Level Security（RLS）](https://www.postgresql.org/docs/current/ddl-rowsecurity.html)更好的了.
+
+[策略](https://www.postgresql.org/docs/current/sql-createpolicy.html)是PostgreSQL的规则引擎。它们非常强大和灵活，允许您编写符合您独特业务需求的复杂SQL规则。
+
+<div className="video-container">
+  <iframe
+    src="https://www.youtube-nocookie.com/embed/Ow_Uzedfohk"
+    frameBorder="1"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+    allowFullScreen
+  ></iframe>
+</div>
+
+## 策略
+
+一旦掌握了策略的窍门，就很容易理解。每个策略都附加到一个表，并执行该策略 每次访问表时。
+您可以将它们看作是向每个查询添加一个`WHERE`子句。例如，这样的策略。。。
+
+```sql
+create policy "Individuals can view their own todos."
+    on todos for select
+    using ( auth.uid() = user_id );
+```
+
+.. 每当用户试图从todos表中进行选择时，都会转换为:
+
+```sql
+select *
+from todos
+where auth.uid() = todos.user_id; -- Policy is implicitly added.
+```
+
+## Helper函数
+
+Supabase为您提供了一些简单的功能，您可以在策略中使用这些功能。
+
+### `auth.uid()`
+
+返回发出请求的用户的ID。
+
+### `auth.jwt()`
+
+返回发出请求的用户的JWT。
+
+## 示例
+
+下面是一些示例，向您展示PostgreSQL的RLS的强大功能。
+
+### 允许读取访问
+
+```sql
+-- 1. Create table
+create table profiles (
+  id uuid references auth.users,
+  avatar_url text
+);
+
+-- 2. Enable RLS
+alter table profiles
+  enable row level security;
+
+-- 3. Create Policy
+create policy "Public profiles are viewable by everyone."
+  on profiles for select using (
+    true
+  );
+```
+
+1. 在公共架构（默认架构）中创建名为`profiles`的表。
+2. 启用行级别安全性。
+3. 创建允许运行所有`select`查询的策略。
+
+### 限制更新
+
+```sql
+-- 1. Create table
+create table profiles (
+  id uuid references auth.users,
+  avatar_url text
+);
+
+-- 2. Enable RLS
+alter table profiles
+  enable row level security;
+
+-- 3. Create Policy
+create policy "Users can update their own profiles."
+  on profiles for update using (
+    auth.uid() = id
+  );
+```
+
+1. 在公共架构（默认架构）中创建名为`profiles`的表。
+2. 启用RLS。
+3. 创建允许登录用户更新自己数据的策略。
+
+### 仅匿名或经过身份验证的访问
+
+您可以添加Postgres角色
+
+```sql
+create policy "Public profiles are viewable by everyone."
+on profiles for select
+to authenticated, anon
+using (
+  true
+);
+```
+
+### 具有联接的策略
+
+策略甚至可以包括表联接。此示例显示了如何查询`外部`表以构建更高级的规则。
+
+```sql
+create table teams (
+  id serial primary key,
+  name text
+);
+
+-- 2. Create many to many join
+create table members (
+  team_id bigint references teams,
+  user_id uuid references auth.users
+);
+
+-- 3. Enable RLS
+alter table teams
+  enable row level security;
+
+-- 4. Create Policy
+create policy "Team members can update team details if they belong to the team."
+  on teams
+  for update using (
+    auth.uid() in (
+      select user_id from members
+      where team_id = id
+    )
+  );
+```
+**注意：**如果还为_members_启用了RLS，则用户还必须具有对_members_1的读取（_select_）权限。否则，连接的查询将不会产生任何结果。
+
+### 具有安全定义器功能的策略
+
+策略还可以使用`安全定义函数`。这在您希望限制对链接表的访问的多对多关系中非常有用。在上面的 `teams`和`members`示例之后，本示例显示了如何将安全定义器函数与策略结合使用，以控制对 `member`表的访问。
+
+```sql
+-- 1. Follow example for 'Policies with joins' above
+
+-- 2.  Enable RLS
+alter table members
+  enable row level security
+
+-- 3.  Create security definer function
+create or replace function get_teams_for_authenticated_user()
+returns setof bigint
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select team_id
+    from members
+    where user_id = auth.uid()
+$$;
+
+-- 4. Create Policy
+create policy "Team members can update team members if they belong to the team."
+  on members
+  for all using (
+    team_id in (
+      select get_teams_for_authenticated_user()
+    )
+  );
+
+```
+
+### 验证电子邮件域
+
+Postgres有一个函数`right（string，n）`，它返回字符串中最右边的n个字符。 您可以使用它来匹配员工的电子邮件域。
+
+```sql
+-- 1. Create table
+create table leaderboard (
+  id uuid references auth.users,
+  high_score bigint
+);
+
+-- 2. Enable RLS
+alter table leaderboard
+  enable row level security;
+
+-- 3. Create Policy
+create policy "Only Blizzard staff can update leaderboard"
+  on leaderboard
+  for update using (
+    right(auth.jwt() ->> 'email', 13) = '@blizzard.com'
+  );
+```
+
+### 行的生存时间
+
+策略也可以用于实现TTL或实时功能，您可以在Instagram故事或Snapchat中看到。
+在下面的示例中，只有在过去24小时内创建了`stories`表的行时，这些行才可用。
+
+```sql
+-- 1. Create table
+create table if not exists stories (
+  id uuid not null primary key DEFAULT uuid_generate_v4(),
+  created_at timestamp with time zone default timezone('utc' :: text, now()) not null,
+  content text not null
+);
+
+-- 2. Enable RLS
+alter table stories
+  enable row level security;
+
+-- 3. Create Policy
+create policy "Stories are live for a day"
+  on stories
+  for select using (
+    created_at > (current_timestamp - interval '1 day')
+  );
+```
+
+### 高级策略
+
+使用SQL的全部功能来构建极其高级的规则。
+
+在本例中，我们将创建一个`posts`和`comments`表，然后创建一个依赖于另一个策略的策略。
+（在这种情况下，评论策略取决于帖子策略。）
+
+```sql
+create table posts (
+  id            serial    primary key,
+  creator_id    uuid      not null     references auth.users(id),
+  title         text      not null,
+  body          text      not null,
+  publish_date  date      not null     default now(),
+  audience      uuid[]    null -- many to many table omitted for brevity
+);
+
+create table comments (
+  id            serial    primary key,
+  post_id       int       not null     references posts(id)  on delete cascade,
+  user_id       uuid      not null     references auth.users(id),
+  body          text      not null,
+  comment_date  date      not null     default now()
+);
+
+create policy "Creator can see their own posts"
+on posts
+for select
+using (
+  auth.uid() = posts.creator_id
+);
+
+create policy "Logged in users can see the posts if they belong to the post 'audience'."
+on posts
+for select
+using (
+  auth.uid() = any (posts.audience)
+);
+
+create policy "Users can see all comments for posts they have access to."
+on comments
+for select
+using (
+  exists (
+    select 1 from posts
+    where posts.id = comments.post_id
+  )
+);
+```
+
+## 提示
+
+### 为数据库表启用实时
+
+实时服务器根据行级别安全（RLS）策略向授权用户广播数据库更改。
+建议您对添加到发布中的表启用行级别安全性并设置行安全策略。
+但是，您可以选择禁用表上的RLS，并将更改广播到所有连接的客户端。
+
+```sql
+/**
+ * REALTIME SUBSCRIPTIONS
+ * Realtime enables listening to any table in your public schema.
+ */
+
+begin;
+  -- remove the realtime publication
+  drop publication if exists supabase_realtime;
+
+  -- re-create the publication but don't enable it for any tables
+  create publication supabase_realtime;
+commit;
+
+-- add a table to the publication
+alter publication supabase_realtime add table products;
+
+-- add other tables to the publication
+alter publication supabase_realtime add table posts;
+```
+
+### 您不必使用策略
+
+您还可以将授权规则放在中间件中，类似于使用任何其他`后端<->中间件<->前端`架构创建安全规则的方式。
+
+政策是一种工具。在“serverless/Jamstack”设置的情况下，它们特别有效，因为您根本不必部署任何中间件。
+
+然而，如果您想为应用程序使用另一种授权方法，这也可以。Supabase`只是Postgres`，所以如果您的应用程序 与Postgres一起工作，然后它也与Supabase一起工作。
+
+提示：确保为所有表启用RLS，这样您的表就不可访问了。然后使用我们提供的“服务”，该服务旨在绕过RLS。
+
+### 切勿在客户端上使用服务密钥
+
+Suabase提供特殊的“服务”键，可用于绕过所有RLS。
+这些内容不应在浏览器中使用或向客户公开，但它们对于管理任务非常有用。
+
+## 不推荐的功能
+
+我们已经弃用了一些功能，以确保RLS策略具有更好的性能和可扩展性。
+
+### `auth.role()`
+
+<Admonition type="caution">
+
+已弃用：`auth。role（）”函数已被弃用，转而使用Postgres中本机支持的“TO”字段。
+
+</Admonition>
+
+```sql
+-- DEPRECATED
+create policy "Public profiles are viewable by everyone."
+on profiles for select using (
+  auth.role() = 'authenticated' or auth.role() = 'anon'
+);
+
+-- RECOMMENDED
+create policy "Public profiles are viewable by everyone."
+on profiles for select
+to authenticated, anon
+using (
+  true
+);
+```
+
+### `auth.email()`
+
+<Admonition type="caution">
+
+已弃用。使用`auth。jwt（）->>改为“电子邮件” `。
+
+</Admonition>
+
+返回提出请求的用户的电子邮件。
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

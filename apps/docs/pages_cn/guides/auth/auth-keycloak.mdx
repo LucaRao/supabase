@@ -1,0 +1,92 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'auth-keycloak',
+  title: '用Keycloak登录',
+  description: '在你的Supabase项目中加入Keycloak OAuth',
+}
+
+要为你的项目启用Keycloak Auth，你需要设置一个Keycloak OAuth应用程序，并将应用程序的凭证添加到你的Supabase仪表板。
+
+## 概述
+
+要开始使用Keycloak，你可以在一个docker容器中运行它。`docker run -e KEYCLOAK_USER=admin -e KEYCLOAK_PASSWORD=admin -p 8080:8080 jboss/keycloak:latest`。
+
+本指南将假设你是在docker容器中运行keycloak，如上面的命令所述。
+
+Keycloak OAuth包括五个大的步骤。
+
+- 在你指定的keycloak领域创建一个新的客户端。
+- 从 `OpenID端点配置`中获取 `发行者`。这将被用作 `Keycloak URL`。
+- 确保新客户端的 `客户端协议`设置为 `openid-connect`，`访问类型`设置为 `机密`。
+- 创建的客户端的 `客户端ID`将被作为 `客户端ID`使用。
+- 从证书标签中获得 `秘密`，它将被用作 `客户秘密`。
+- 将你的应用程序的回调网址添加到你的允许列表中。
+
+## 访问你的Keycloak管理控制台
+
+- 通过访问[`http://localhost:8080`](http://localhost:8080)并点击 "管理控制台 "登录。
+
+##创建一个Keycloak境界
+
+- 一旦你登录到Keycloak控制台，你就可以从侧面面板添加一个境界。默认的境界应该被命名为 `Master`。
+- 在你添加了一个新的境界后，你可以从 `OpenID端点配置`端点检索到`issuer`。签发人 `将被用作 `Keycloak URL`。
+- 你可以从 `常规标签`下的境界设置中找到这个端点，或者访问[`http://localhost:8080/realms/my_realm_name/.well-known/openid-configuration`](http://localhost:8080/realms/my_realm_name/.well-known/openid-configuration)
+
+![Add a Keycloak Realm.](/docs/img/guides/auth-keycloak/keycloak-create-realm.png)
+
+## 创建一个Keycloak客户端
+
+创建的客户端的 `客户端ID`将作为`client_id`，当你进行API调用以验证用户。
+
+![Add a Keycloak client](/docs/img/guides/auth-keycloak/keycloak-add-client.png)
+
+## 客户端设置
+
+在你成功创建客户端后，确保你设置了以下设置。
+
+1. 客户端协议应该被设置为 `openid-connect`。
+2. `访问类型`应设置为 `保密`。
+3. `有效重定向URI`应设置为。`https://<project-ref>.supabase.co/auth/v1/callback`。
+
+![Obtain the client id, set the client protocol and access type](/docs/img/guides/auth-keycloak/keycloak-client-id.png)
+![Set redirect uri](/docs/img/guides/auth-keycloak/keycloak-redirect-uri.png)
+
+## 获取客户秘密
+
+当你调用API验证用户时，这将作为 `客户秘密`。
+在 `证书`标签下，`秘密`值将被用作 `客户秘密`。
+
+![Obtain the client secret](/docs/img/guides/auth-keycloak/keycloak-client-secret.png)
+
+## 在你的客户端应用程序中添加登录代码
+
+当你的用户登录时，调用[signInWithOAuth()](/docs/reference/javascript/auth-signinwithoauth)，将`keycloak`作为`provider`。
+
+```js
+async function signInWithKeycloak() {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'keycloak',
+    options: {
+      scopes: 'openid',
+    },
+  })
+}
+```
+
+当你的用户签出时，调用[signOut()](/docs/reference/javascript/auth-signout)，将他们从浏览器会话和任何对象从localStorage中移除。
+
+```js
+async function signout() {
+  const { error } = await supabase.auth.signOut()
+}
+```
+
+## 资源
+
+- 你可以在境界设置下找到keycloak openid端点配置。
+  ![Keycloak OpenID Endpoint Configuration](/docs/img/guides/auth-keycloak/keycloak-openid-endpoint-config.png)
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

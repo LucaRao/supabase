@@ -1,0 +1,105 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'dashibase',
+  title: 'Dashibase',
+  description: 'Create an internal CRUD dashboard with Supabase and Dashibase in 15 mins.',
+}
+
+你是否厌倦了构建管理面板？[Dashibase](https://dashibase.com/)是一种超级快速的方法，可以用类似Notion的UI来构建内部CRUD仪表盘。
+
+本指南将指导你如何在后台使用Supabase和在前台使用Dashibase建立一个客户管理面板，这样你和你的团队就可以轻松地找到和更新客户信息。
+
+## 快速解释
+
+为了使我们处于同一起跑线上，以下是我们使用的一些术语。
+
+- **数据源：**这是为你的仪表板提供动力的数据（即你的Supabase数据库）。
+- 仪表盘：**这是你使用Dashibase在Supabase数据库之上建立的友好界面。
+- **页面：**每个仪表板可以有多个页面。每个页面可以有多个文本块或表格。
+
+现在已经结束了，让我们来建立我们的客户管理面板。
+
+(开始你的秒表！)
+
+## 步骤1. 将Supabase连接到Dashibase
+
+首先，在Dashibase中，通过左边的侧边栏进入 "数据源"，点击右上角的 "连接数据源"。
+
+注意：我们不会下载或存储你的任何数据库数据。
+
+![Connect Supabase to Dashibase](/docs/img/guides/integrations/dashibase/connect-database.png)
+
+输入你的数据库凭证，你可以在Supabase的设置>数据库>连接信息下找到。为了增加安全性，你也可以下载你的SSL证书并将其上传到Dashibase。
+
+![Supabase credentials](/docs/img/guides/integrations/dashibase/supabase-credentials.png)
+
+## 第2步。设置你的数据访问策略
+
+一旦你连接了你的数据库，你也可以通过Dashibase控制你的团队可以在数据库中看到和编辑什么。通常有一些数据是你不希望别人编辑甚至看到的（如地址、电子邮件、身份证号码）。
+
+注意：如果你喜欢在连接到Dashibase之前出于安全原因限制对数据库的访问，你可以通过[Supabase的SQL编辑器](/docs/guides/database#the-sql-editor)[创建一个受限用户](https://aws.amazon.com/blogs/database/managing-postgresql-users-and-roles/)。在Dashibase中这样做的一点好处是有一个GUI，这使得设置访问控制更容易（但我们理解一些开发人员可能会发现自己限制访问更安全）。
+
+![Set data access in Dashibase](/docs/img/guides/integrations/dashibase/set-data-access.png)
+
+你甚至可以控制别人可以看到和编辑表中的哪些列。在下面的例子中，对于`tags`表，`name`列可以被读取和更新，`created_at`列可以被读取，而`id`列甚至不能被读取。
+
+![Set column-level access in Dashibase](/docs/img/guides/integrations/dashibase/set-column-access.png)
+
+在签到后添加一个MFA步骤。使用Supabase Auth以电子邮件和密码登录，使用Authsignal启动Authenticator App挑战。
+
+![Set user access to data source in Dashibase](/docs/img/guides/integrations/dashibase/data-source-user-access.png)
+
+## 第3步。建立你的仪表板
+
+要创建一个仪表盘，通过Dashibase的左侧边栏进入 `仪表盘`，点击右上角的 `创建仪表盘`。
+
+这里是有趣的开始。在Dashibase中，有许多方法可以使用markdown格式和斜线命令等功能来建立你的仪表盘。
+
+你会在仪表盘中看到一些自动生成的内容，这样你就可以更快地设置你的仪表盘了。对于这个例子，让我们把它们清除掉，从头开始。
+
+![Automatically-generated content for your dashboard](/docs/img/guides/integrations/dashibase/initial-dashboard-content.png)
+
+使用我们类似Notion的用户界面，你可以通过输入快速建立你的仪表盘。例如，你可以键入'/table'来从你的数据库中添加一个表到你的仪表盘上。不再需要在屏幕上拖动组件，也不再需要在空白的画布上反复拖动它们。
+
+![Automatically-generated content for your dashboard](/docs/img/guides/integrations/dashibase/slash-command.gif)
+
+如果你已经设置了[Supabase数据库中的外键](/docs/guides/database/tables#joining-tables-with-foreign-keys)，你就可以在Dashibase仪表板的表格上轻松显示多个表的数据。只需点击 `过滤器`按钮旁边的 `列`按钮，选择你想显示或隐藏的列。在这个例子中，我们想显示客户的国家和计划价格，它们分别在 `国家`和 `计划`表中。
+
+![Setting up the Customers table](/docs/img/guides/integrations/dashibase/customers-table.png)
+
+对于你的仪表盘中的所有表格，你可以重命名列标题，添加过滤器和排序，调整列的宽度，以及更多。
+
+你还可以添加文本，为你的团队其他成员在使用你的仪表盘时提供背景或说明。这为你省去了将仪表盘和文档放在不同地方的麻烦。
+
+![Customers table with instructions](/docs/img/guides/integrations/dashibase/customers-table-with-text.png)
+
+最重要的是，我们为你表中的每个项目自动生成一个单项视图，这样你就不必自己手动创建。你可以像在Notion中一样轻松地编辑或重新安排这些块。
+
+![Automatically generated single-item view](/docs/img/guides/integrations/dashibase/single-item-view.png)
+
+## 第四步。与你的团队分享你的仪表板
+
+最后，保存并与你的团队分享仪表盘。有两个级别的访问。
+
+- 编辑仪表盘。编辑文本块，编辑表格，等等。
+- 使用仪表盘。通过仪表盘查看和更新数据
+
+点击仪表盘右上角的 `分享`按钮，可以分享访问权限。
+
+![Share dashboard access](/docs/img/guides/integrations/dashibase/share-dashboard.png)
+
+现在你的团队可以使用这个客户管理面板，轻松查找和更新客户信息
+
+P.S. 我们花了多长时间？ :)
+
+## 资源
+
+- [Dashibase网站](https://dashibase.com/)
+- [Dashibase开源版本](https://github.com/dashibase)
+- [Dashibase Twitter](https://twitter.com/dashibase)
+- [Dashibase Discord](https://discord.gg/crhDFYvbbq)
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

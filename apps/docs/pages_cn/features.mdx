@@ -1,0 +1,167 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'features',
+  title: '功能',
+  description: 'Supabase features',
+}
+
+这是Supabase为每个项目提供的功能的非详尽列表。
+
+## 数据库
+
+### Postgres数据库
+
+每个项目都是一个完整的Postgres数据库. [文档](/docs/guides/database).
+
+### 数据库扩展
+
+每个数据库都有一整套Postgres扩展. [文档](/docs/guides/database/extensions).
+
+### 数据库函数
+
+创建可以从浏览器调用的自定义数据库函数. [文档](/docs/guides/database/functions).
+
+### 数据库触发器
+
+将触发器附加到表以处理数据库更改. [文档](/docs/guides/auth/managing-user-data#using-triggers).
+
+
+### 数据库备份
+
+每天备份项目，可选择升级到时间点恢复.
+
+### 搜索
+
+使用Postgres全文搜索构建搜索功能. [文档](/docs/guides/database/full-text-search).
+
+### 机密和加密
+
+使用我们的Postgres扩展Supabase Vault加密敏感数据并存储机密 [链接](https://supabase.com/blog/supabase-vault).
+
+### 数据库迁移
+
+在本地开发并使用迁移将更改推送到生产数据库. [文档](/docs/guides/cli/local-development#database-migrations)
+
+<br />
+
+## 身份验证
+
+### 电子邮件和密码登录
+
+为您的应用程序或网站建立电子邮件登录. [文档](/docs/guides/auth/auth-email).
+
+### 魔法链接
+
+为应用程序或网站建立无密码登录.[文档](/docs/guides/auth/auth-magic-link).
+
+### 社交登录
+
+提供社交登录-从苹果到GitHub，再到Slack. [文档](/docs/guides/auth/auth-apple).
+
+### 电话登录
+
+使用第三方SMS提供商提供电话登录. [文档](/docs/guides/auth/auth-twilio).
+
+### 行级别安全性
+
+使用Postgres策略控制每个用户可以访问的数据. [文档](/docs/guides/auth/row-level-security).
+
+### 服务器端身份验证帮助程序
+
+用于在流行框架中实现用户身份验证的帮助程序，如[Next.js](/docs/guides/auth/auth-helpers/nextjs) 和[SvelteKit](/docs/guides/auth/auth-helpers/sveltekit)
+
+### 身份验证UI工具包
+
+使用自定义主题构建登录和注册页面. [文档](/docs/guides/auth/auth-helpers/auth-ui).
+
+<br />
+
+## API和客户端库
+
+### 自动生成的REST API
+
+RESTful API是从数据库自动生成的，无需一行代码. [文档](/docs/guides/api#rest-api-overview).
+
+### 自动生成的GraphQL API
+
+使用我们的自定义PostgresGraphQL扩展的快速GraphQL API. [文档](/docs/guides/api#graphql-api-overview).
+
+### 实时数据库变更
+
+通过websockets接收数据库更改. [文档](/docs/guides/realtime/postgres-cdc).
+
+### 用户广播
+
+通过websocket在连接的用户之间发送消息. [文档](/docs/guides/realtime#broadcast).
+
+### 用户状态
+
+跨用户同步共享状态，包括联机状态和键入指示符. [文档](/docs/guides/realtime#presence).
+
+### 客户端库
+
+官方客户端库[JavaScript](/docs/reference/javascript/)和非官方客户端库[Dart](/docs/reference/dart)，[由社区支持](https://github.com/supabase-community#client-libraries)。 
+
+<br />
+
+## 文件存储
+
+### 大文件存储
+
+Supabase 存储使存储和服务大文件变得简单. [文档](/docs/guides/storage).
+
+### 存储CDN
+
+使用Supabase CDN缓存大文件. [文档](/docs/guides/storage-cdn).
+
+<br />
+
+
+## 项目管理
+
+### CLI
+
+使用我们的CLI在本地开发项目并部署到Supabase平台. [Docs](/docs/reference/cli).
+
+### 管理API
+
+以编程方式管理项目. [Docs](/docs/reference/api).
+
+<br />
+
+## 功能状态
+
+Postgres和Supabase平台都已做好生产准备。我们在Postgres之上提供的一些工具仍在开发中。
+
+| 产品                   | 功能                | 阶段   |
+| -------------------------- | ---------------------- | ------- |
+| Database                   | Postgres               | `GA`    |
+| Database                   | Triggers               | `GA`    |
+| Database                   | Functions              | `GA`    |
+| Database                   | Extensions             | `GA`    |
+| Database                   | Full Text Search       | `GA`    |
+| Database                   | Webhooks               | `alpha` |
+| Database                   | Point-in-Time Recovery | `alpha` |
+| Database                   | Vault                  | `alpha` |
+| Studio                     |                        | `GA`    |
+| Realtime                   | Postgres CDC           | `GA`    |
+| Realtime                   | Broadcast              | `beta`  |
+| Realtime                   | Presence               | `beta`  |
+| Storage                    | Backend (S3)           | `GA`    |
+| Storage                    | API                    | `beta`  |
+| Storage                    | CDN                    | `beta`  |
+| Edge Functions             |                        | `beta`  |
+| Auth                       | OAuth Providers        | `beta`  |
+| Auth                       | Passwordless           | `beta`  |
+| Auth                       | Next.js Auth Helpers   | `alpha` |
+| Auth                       | SvelteKit Auth Helpers | `alpha` |
+| Auth                       | Remix Auth Helpers     | `alpha` |
+| Management API             |                        | `beta`  |
+| CLI                        |                        | `beta`  |
+| Client Library: JavaScript |                        | `GA`    |
+| Client Library: Dart       |                        | `beta`  |
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

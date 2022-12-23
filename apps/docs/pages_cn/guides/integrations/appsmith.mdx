@@ -1,0 +1,173 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'appsmith',
+  title: 'Appsmith',
+  description:
+    '开始使用Supabase和Appsmith，一个用于构建内部工具的开源框架。',
+}
+
+本指南解释了如何通过连接Supabase后端和Appsmith前端来快速建立一个支持仪表板。
+
+[Appsmith](https://www.appsmith.com/)是一个用于构建内部工具的开源框架。它让你可以拖放UI组件来构建页面，连接到任何API、数据库或GraphQL源，并使用JavaScript对象编写逻辑。
+
+如果你没有一个Appsmith账户，请创建一个[这里](https://app.appsmith.com/user/signup)。
+
+让我们开始吧!
+
+## 第1步：在Supabase上设置你的后端
+
+- 在[Supabase仪表板](https://app.supabase.com)上，点击 `新项目`，将名称设为**支持仪表板**。
+
+![create-project-supabase-01](/docs/img/guides/integrations/appsmith/create-project-supabase-01.png)
+
+- 通过点击侧面导航中的创建表选项来创建一个新的表。
+- Supabase提供了许多向表添加数据的方法，从编写查询到使用用户界面创建模式到简单地上传CSV文件。对于我们的支持仪表板，我们将通过在Supabase上上传[CSV文件](https://raw.githubusercontent.com/vihar/datasets/master/tickets.csv)来创建**tickets**表。
+
+![create-table-supabase-02](/docs/img/guides/integrations/appsmith/create-table-supabase-02.png)
+
+现在数据库已经设置好了。
+
+## 第二步：将数据库连接到Appsmith
+
+- 记下Supabase中项目设置下的数据库连接信息。
+
+![project-settings-supabase-03](/docs/img/guides/integrations/appsmith/project-settings-supabase-03.png)
+
+- 在Appsmith上，在你喜欢的组织下的仪表板下创建一个新的应用程序。
+- 点击左侧导航栏上Page1下数据源旁边的`+`图标
+- 接下来，点击创建新标签，选择PostgreSQL数据源，你会看到下面的截图。
+
+![create-datasource-appsmith-04](/docs/img/guides/integrations/appsmith/create-datasource-appsmith-04.png)
+
+- 填写表格以连接到你的Supabase实例。点击**测试**来测试连接，然后点击**保存**来保存数据源。
+
+![connect-supabase-datasource-05](/docs/img/guides/integrations/appsmith/connect-supabase-datasource-05.png)
+
+## 第3步：在Appsmith上建立UI
+
+- 点击小组件旁边的+图标，拖放一个Tab小组件。我们可以通过点击右上角的齿轮图标，使用属性窗格进行配置。
+- 如下面的截图所示，我们已经添加了四个标签来支持仪表板。
+
+![property-pane-appsmith-06](/docs/img/guides/integrations/appsmith/property-pane-appsmith-06.png)
+
+- 在**主页**标签上添加部件，以创建仪表板，如下图所示。比如说。**关键的开放问题**是一个**文本**部件，在它下面是一个**输入**部件，我们将在后面绑定显示开放票据的数量。
+
+- 设置**新**按钮，打开一个模态，其中有一个表单可以提出一个新票据。
+
+![bind-query-appsmith-07](/docs/img/guides/integrations/appsmith/bind-query-appsmith-07.png)
+
+- 在模态小部件中，添加一些小部件，以便在创建新票时接受输入。请参考下面的屏幕截图。
+
+![modal-appsmith-08](/docs/img/guides/integrations/appsmith/modal-appsmith-08.png)
+
+## 第4步：在Appsmith中编写查询，并将数据绑定到部件上
+
+- 点击导航栏上数据源旁边的 "+"图标，然后点击这里的Supabase连接旁边的 `新查询`来创建一个新查询。
+
+![create-query-appsmith-09](/docs/img/guides/integrations/appsmith/create-query-appsmith-09.png)
+
+- 将查询重命名为查询窗格下的create_new_ticket；在这里我们可以写SQL，可以使用mustache模板从widgets收集数据。
+
+```jsx
+INSERT INTO PUBLIC."tickets"("id","createdAt","user","updatedAt","description",
+"status","priority","category","assignedTo")
+VALUES('{{appsmith.store.ticket.id}}','{{moment().format('yyyy-mm-ddHH:MM:ss')}}','{{c_user.text}}',
+'{{moment().format('yyyy-mm-ddHH:MM:ss')}}','{{c_description.text}}','{{c_status.selectedOptionValue}}',
+'{{c_property.selectedOptionValue}}',
+'{{c_category.selectedOptionValue}}','{{c_assignee.selectedOptionValue}}');
+```
+
+- 点击模式上的**确认**按钮，在**事件下，设置**onClick**属性以执行create_new_ticket查询。
+- 创建第二个名为**get_tickets**的查询，将列出所有的票。
+
+  ***
+
+```jsx
+SELECT * FROM public."tickets";
+```
+
+- 在**分配给我的**标签下拖放一个表格小组件。打开属性窗格，在**表数据**下添加以下片段，以绑定查询结果。
+
+```jsx
+{
+  {
+    get_tickets.data.filter(
+      (t) => t.assignedTo === 'confidence@appsmith.com' && t.status !== 'closed'
+    )
+  }
+}
+```
+
+- 在**解决的**标签下拖放一个表格小组件。打开属性窗格，在**表数据**下添加以下片段，以绑定查询结果。
+
+```jsx
+{
+  {
+    get_tickets.data.filter((t) => t.status === 'open')
+  }
+}
+```
+
+- 在**关闭的**标签下拖放一个表格小组件。打开属性窗格，在**表数据**下添加以下片段，以绑定查询结果。
+
+```jsx
+{
+  {
+    get_tickets.data.filter((t) => t.status === 'closed')
+  }
+}
+```
+
+## 第5步：在Appsmith中创建图表
+
+- 在**首页**选项卡上，点击第一个图表小部件。添加标题**按类别打开问题**。将**图表类型**属性改为**柱状图**。
+- 在属性窗格的**轴**下更新X轴和Y轴的标签。
+- 在**系列数据**属性下添加以下代码片断，以绑定要显示在x轴和y轴上的数据。
+
+```jsx
+[
+  {
+    "x": "Hardware",
+    "y": {{get_tickets.data.filter(t => t.status==='open' && t.category==='hardware').length}}
+  },
+  {
+    "x": "Software",
+    "y": {{get_tickets.data.filter(t => t.status==='open' && t.category==='software').length}}
+  },
+  {
+    "x": "Other",
+    "y": {{get_tickets.data.filter(t => t.status==='open' && t.category==='other').length}}
+  }
+]
+```
+
+- 第二个图表将是一个饼状图。如上所述，添加标题、坐标轴标签。
+- 在饼图的**系列数据**属性下添加以下代码片断。
+
+```jsx
+[
+  {
+    "x": "High",
+    "y": {{get_tickets.data.filter(t => t.status==='open' && t.priority==='high').length}}
+  },
+  {
+    "x": "Medium",
+    "y": {{get_tickets.data.filter(t => t.status==='open' && t.priority==='medium').length}}
+  },
+  {
+    "x": "Low",
+    "y": {{get_tickets.data.filter(t => t.status==='open' && t.priority==='low').length}}
+  }
+]
+```
+
+## 资源
+
+- [Appsmith](https://www.appsmith.com/) 官方网站。
+- [Appsmith GitHub](https://github.com/appsmithorg)。
+- [Appsmith](https://docs.appsmith.com/) 文档。
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

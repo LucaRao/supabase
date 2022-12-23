@@ -1,0 +1,83 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'introduction',
+  title: '介绍',
+  description: 'Introduction to Supabase',
+  hide_table_of_contents: true,
+}
+
+Supabase是一个开源Firebase替代方案，提供构建产品所需的所有后端功能。 你可以完全使用它，或者只使用你需要的功能。
+
+[启动项目](https://app.supabase.com)使用托管平台或学习如何自己[托管Supabase](/docs/guides/hosting/overview)。
+
+
+## 了解功能
+
+<div className="grid md:grid-cols-12 gap-4">
+  <div className="col-span-4">
+    <ButtonCard
+      className="card"
+      to={'/guides/auth'}
+      title={'身份验证'}
+      description={'具有行级安全性的用户管理.'}
+      style={{ height: '100%' }}
+    />
+  </div>
+  <div className="col-span-4">
+    <ButtonCard
+      className="card"
+      to={'/guides/api'}
+      title={'自动生成的APIs'}
+      description={'立即为数据库生成APIs.'}
+      style={{ height: '100%' }}
+    />
+  </div>
+  <div className="col-span-4">
+    <ButtonCard
+      className="card"
+      to={'/guides/database'}
+      title={'数据库'}
+      description={'专用的、可扩展的Postgres数据库.'}
+      style={{ height: '100%' }}
+    />
+  </div>
+  <div className="col-span-4">
+    <ButtonCard
+      className="card"
+      to={'/guides/realtime'}
+      title={'实时'}
+      description={'使用广播、存在和Postgres CDC构建.'}
+      style={{ height: '100%' }}
+    />
+  </div>
+  <div className="col-span-4">
+    <ButtonCard
+      className="card"
+      to={'/guides/storage'}
+      title={'文件存储'}
+      description={'存储、组织和服务大型文件.'}
+      style={{ height: '100%' }}
+    />
+  </div>
+  <div className="col-span-4">
+    <ButtonCard
+      className="card"
+      to={'/guides/platform/logs'}
+      title={'可观察性'}
+      description={'监视和调试基础架构.'}
+      style={{ height: '100%' }}
+    />
+  </div>
+</div>
+
+## 从框架开始
+
+Supabase是一个Postgres，这使得它兼容许多工具和框架。
+
+<Frameworks />
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page
+

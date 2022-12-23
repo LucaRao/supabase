@@ -1,0 +1,191 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'clerk',
+  title: 'Clerk',
+  description:
+    '本指南解释了如何将你的Supabase数据库与Clerk连接起来，Clerk是一个为现代网络建立的强大的认证提供者。',
+}
+
+本指南解释了如何将您的 Supabase 数据库与 [Clerk](https://clerk.dev) 连接，后者是为现代网络构建的身份验证提供商。
+
+Clerk 可以验证用户，管理会话令牌，并提供用户管理功能，这些功能可以与 Supabase 中通过 PostgreSQL 行级安全 (RLS) 策略提供的授权逻辑结合使用。
+
+本指南假定你已经设置了一个 Supabase 帐户和数据库项目。
+
+如果你没有一个管理员帐户，你可以[现在就创建一个](https://dashboard.clerk.dev/sign-up)。
+
+## 第1步：创建JWT模板
+
+第一步是在你的Cler Dashboard上创建一个新的Cler应用程序，如果你还没有这样做的话。你可以选择你喜欢的任何认证策略和社交登录供应商。欲了解更多信息，请查看Clerk的[指南](https://docs.clerk.dev/popular-guides/setup-your-application)。
+
+在你的办事员应用程序创建后，使用左手边的菜单导航到**JWT模板**页面。
+
+点击按钮，创建一个基于Supabase的新模板。
+
+![Create Supabase JWT template from Clerk dashboard](/docs/img/guides/integrations/clerk/01_supabase-template.png)
+
+这将预先填入Supabase要求的默认索赔。你可以包括额外的索赔，或根据需要修改它们。[Shortcodes](https://docs.clerk.dev/popular-guides/jwt-templates#shortcodes)也可用于添加动态值。
+
+ℹ️注意JWT模板的名称（你可以改变），因为以后会需要这个。
+
+![JWT template claims](/docs/img/guides/integrations/clerk/02_jwt-claims.png)
+
+## 第2步：用Supabase的秘密签署JWT
+
+Supabase要求用HS256签名算法签署JWT，并使用其签名密钥。在你的Supabase项目中，在**设置**>**API**的**配置**部分找到JWT秘钥。
+
+![Sign with Supabase secret](/docs/img/guides/integrations/clerk/03_jwt-secret.png)
+
+点击揭示JWT的秘密，复制它，然后将它粘贴到Clerk JWT模板的签名密钥字段中。
+
+![Paste signing key](/docs/img/guides/integrations/clerk/04_signing-key.png)
+
+添加完密钥后，点击**应用更改**按钮，保存你的模板。
+
+## 第三步：配置客户端
+
+下一步是配置你的客户端。Supabase提供了一个官方的[JavaScript/TypeScript客户端库](https://github.com/supabase/supabase-js)，还有一些由社区建立的[其他语言的库](/docs/reference/javascript/installing)。
+
+本指南将以使用JS客户端的Next.js项目为例，但设置认证令牌的机制与其他库和框架应该是类似的。
+
+假设一个Next.js应用程序，在`.env.local`文件中设置以下环境变量。
+
+```bash
+NEXT_PUBLIC_CLERK_FRONTEND_API=your-frontend-api
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_KEY=your-supabase-anon-key
+```
+
+**注意**。如果你使用Create React App，将`NEXT_PUBLIC`前缀替换为`REACT_APP`。
+
+你的Clerk Frontend API可以在[API Keys](https://dashboard.clerk.dev/last-active?path=api-keys)屏幕上找到。
+
+![Clerk Frontend API](/docs/img/guides/integrations/clerk/05_clerk-frontend-api.png)
+
+要获得Supabase所需的，请浏览与之前相同的设置>API页面，找到匿名公钥和URL。
+
+![Supabase keys](/docs/img/guides/integrations/clerk/06_supabase-keys.png)
+
+**注意**。建议你为你的数据库表启用[行级安全](/docs/guides/auth/row-level-security)（RLS），并根据需要配置访问策略。
+
+设置完这三个环境变量后，你应该可以启动你的应用程序开发服务器了。
+
+用以下方法安装Supabase的JavaScript客户端。
+
+```bash
+npm install @supabase/supabase-js
+```
+
+通过传递环境变量来初始化Supabase客户端。
+
+这可以保存在一个普通的文件中，例如作为`lib/supabaseClient.js`。
+
+```jsx
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_KEY
+
+export const supabase = createClient(supabaseUrl, supabaseKey)
+export default supabase
+```
+
+## 第4步：设置Clerk供应商
+
+通过运行以下程序安装最新的Clerk Next.js SDK。
+
+```bash
+npm install @clerk/nextjs@next
+```
+
+**注意**。还有一个用于[React](https://github.com/clerkinc/javascript/tree/main/packages/react)和[React Native with Expo](https://github.com/clerkinc/javascript/tree/main/packages/expo)的Clerk库。
+
+安装完软件包后，用`<ClerkProvider />`组件来包装你的应用程序。
+
+在Next.js应用程序中，这通常是在`pages/_app.js`中完成。
+
+```jsx
+import { ClerkProvider } from '@clerk/nextjs'
+
+function MyApp({ Component, pageProps }) {
+  return (
+    <ClerkProvider>
+      <Component {...pageProps} />
+    </ClerkProvider>
+  )
+}
+
+export default MyApp
+```
+
+## 第5步：用Supabase设置授权令牌
+
+为了访问自定义的JWT，你可以使用Clerk `useAuth`钩子返回的`getToken`函数，并将你的模板名称（希望你在前面记得）传给它。
+
+**注意**。`getToken({ template: <your-template-name> })`调用是异步的，并返回一个Promise，在访问令牌值之前需要解析。为了提高安全性，这个令牌是短暂的，应该在每次向你的Supabase后端请求之前调用。缓存和刷新令牌的工作由Clerk自动处理。
+
+调用`supabase.auth.setAuth(token)`来覆盖当前客户端的JWT。然后，JWT将与所有后续的网络请求一起被发送到Supabase。
+
+```jsx
+import { useAuth } from '@clerk/nextjs'
+import supabase from '../lib/supabaseClient'
+
+export default function Home() {
+  const { getToken } = useAuth()
+
+  const fetchData = async () => {
+    // TODO #1: Replace with your JWT template name
+    const token = await getToken({ template: 'supabase' })
+
+    supabase.auth.setAuth(token)
+
+    // TODO #2: Replace with your database table name
+    const { data, error } = await supabase.from('your_table').select()
+
+    // TODO #3: Handle the response
+  }
+
+  return (
+    <button type="button" onClick={fetchData}>
+      Fetch data
+    </button>
+  )
+}
+```
+
+## 访问RLS策略中的用户ID
+
+在数据库层面上需要访问用户标识符是很常见的做法，特别是在Postgres中使用RLS策略时。尽管Supabase提供了一个特殊的函数`auth.uid()`来从JWT中提取用户ID，但这并不适用Clerk。解决办法是编写一个自定义的SQL函数，从JWT声明中读取`sub`属性。
+
+在Supabase仪表板的**SQL编辑器**部分，点击新查询并输入以下内容。
+
+```sql
+create or replace function requesting_user_id()
+returns text
+language sql stable
+as $$
+  select nullif(current_setting('request.jwt.claims', true)::json->>'sub', '')::text;
+$$;
+```
+
+这将创建一个`requesting_user_id()`函数，可以在RLS策略中使用。
+
+例如，这个策略将检查提出请求的用户是否经过认证，并与todos表中的`user_id`列相匹配。
+
+##访问表列中的用户ID
+
+如果你想让JWT中的请求用户ID自动填充到数据库表中的文本类型列中，你可以将**默认值**字段设置为之前定义的`requesting_user_id()`函数。
+
+![Set requesting_user_id() as default value](/docs/img/guides/integrations/clerk/07_requesting-user-id.png)
+
+## 资源
+
+- [Clerk + Supabase启动程序](https://github.com/clerkinc/clerk-supabase-starter)
+- [Next.js + Supabase + Clerk教程](https://clerk.dev/blog/nextjs-supabase-todos-with-multifactor-authentication)
+- [Next.js认证的Cler指南](https://docs.clerk.dev/get-started/nextjs)
+- [Clerk 社区 Discord 频道](https://discord.com/invite/b5rXHjAg7A)
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

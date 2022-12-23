@@ -1,0 +1,96 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'performance',
+  title: '性能调试',
+  description: '从你的Supabase项目中获得最佳结果',
+}
+
+Supabase平台自动优化你的Postgres数据库，以利用你的项目所在层的计算资源。然而，这些优化是基于对项目所使用的工作流类型的假设，通过为你的特定工作流调整数据库，可能会获得更好的结果。
+
+## 优化连接数
+
+默认情况下，允许Postgres和PgBouncer的连接数是根据数据库的可用资源来配置的。
+
+| Compute Add-on | Postgresql connections | PGBouncer connections |
+| -------------- | ---------------------- | --------------------- |
+| None           | 60                     | 200                   |
+| Small          | 90                     | 200                   |
+| Medium         | 120                    | 200                   |
+| Large          | 160                    | 300                   |
+| XL             | 240                    | 700                   |
+| 2XL            | 380                    | 1500                  |
+| 4XL            | 480                    | 3000                  |
+| 8XL            | 490                    | 6000                  |
+| 12XL           | 500                    | 9000                  |
+| 16XL           | 500                    | 12000                 |
+
+如果连接数不足，你在连接到数据库时将收到以下错误。
+
+```shell
+$ psql -U postgres -h ...
+FATAL: remaining connection slots are reserved for non-replication superuser connections
+```
+
+在这种情况下，你可以考虑。
+
+- [升级到一个更大的计算插件](https://app.supabase.com/project/_/settings/billing)
+- 将你的客户配置为使用较少的连接
+- 手动配置数据库以获得更多的连接数
+
+### 配置客户端使用更少的连接数
+
+你可以使用[pg_stat_activity](https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW)视图来调试哪些客户端在你的数据库上持有开放连接。`pg_stat_activity`只公开了与数据库直接连接的信息。pgbouncer的连接数的信息可以[通过metrics端点](.../platform/metrics)获得。
+
+根据所涉及的客户端，你也许可以配置它们使用更少的连接数（例如，通过对允许使用的最大连接数进行限制），或者将特定的工作负载转移到通过 [pgbouncer](/docs/guides/database/connecting-to-postgres#connection-pool) 来连接。瞬息万变的工作流，可以根据流量迅速扩大和缩小（例如无服务器功能），可以从使用连接池而不是直接连接到数据库中特别受益。
+
+### 允许更多的连接数
+
+你可以通过执行下面的语句来配置Postgres，然后再重启服务器。
+
+```sql
+alter system set max_connections = '<val-here>';
+```
+
+请注意，[Supabase平台使用的默认配置](https://github.com/supabase/supabase-admin-api/blob/master/optimizations/postgres.go)优化了数据库以最大限度地提高资源利用率，因此，你可能还需要配置其他选项（例如`work_mem`、`shared_buffers`、`maintenance_work_mem`），以便针对你的使用情况进行调整，并避免造成数据库的不稳定。
+
+一旦被覆盖，Supabase平台将继续尊重你手动配置的值（即使改变了附加组件的大小），除非用以下语句删除覆盖，然后重新启动服务器。
+
+```sql
+alter system reset max_connections;
+alter system reset <other-overridden-conf>;
+...
+```
+
+目前还不支持配置PgBouncer的连接数。
+
+## 检查查询性能
+
+每个Supabase项目都默认启用了[pg_stat_statements扩展](https://www.postgresql.org/docs/14/pgstatstatements.html)。这个扩展记录了查询执行性能的细节，是找到执行时间最长的查询的最好方法。这些信息可以与Postgres查询计划分析器结合起来，以开发更有效的查询。
+
+从pg_stat_statements获取信息。
+
+```sql
+select mean_exec_time + stddev_exec_time, * from pg_stat_statements order by 1 desc;
+```
+
+在你的查询中使用查询计划分析器。
+
+```sql
+explain analyze <query-statement-here>;
+```
+
+小心使用`explain analyze`与`insert`/`update`/`delete`查询，因为该查询将实际运行，并可能产生意想不到的副作用。
+
+使用查询计划分析器来优化你的查询是一个很大的话题，有许多在线资源可以使用。
+
+- [Official docs.](https://www.postgresql.org/docs/current/using-explain.html)
+- [The Art of PostgreSQL.](https://theartofpostgresql.com/explain-plan-visualizer/)
+- [Postgres Wiki.](https://wiki.postgresql.org/wiki/Using_EXPLAIN)
+- [Enterprise DB.](https://www.enterprisedb.com/blog/postgresql-query-optimization-performance-tuning-with-explain-analyze)
+
+你可以将`pg_stat_statements`提供的信息与[通过你的指标端点](.../platform/metrics)提供的详细系统指标配对，以更好地了解你的数据库的行为和你对它执行的查询。
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

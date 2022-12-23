@@ -1,0 +1,406 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'supertokens',
+  title: 'SuperTokens',
+  description:
+    '创建一个由SuperTokens和PostgreSQL行级安全保障的Next.js应用程序。',
+}
+
+[SuperTokens](https://www.supertokens.com)是一个开源的认证解决方案，为认证和管理用户提供许多策略。你可以使用管理服务来进行简单的设置，也可以自行托管该解决方案以完全控制你的数据。
+
+在本指南中，我们将使用SuperTokens、Supabase和Next.js构建一个简单的Web应用程序。你将能够使用SuperTokens进行注册，你的电子邮件和用户ID将被存储在Supabase中。一旦通过认证，前端将能够查询Supabase并检索用户的电子邮件。我们的示例应用程序将使用[电子邮件-密码和社交登录](https://supertokens.com/docs/thirdpartyemailpassword/introduction)配方进行认证和会话管理。
+
+我们将使用Supabase来存储和授权对用户数据的访问。Supabase使得设置行级安全(RLS)策略变得非常简单，它可以确保用户只能读写属于他们的数据。
+
+###演示应用程序
+
+你可以在[Github](https://github.com/supertokens/supertokens-auth-react/tree/master/examples/with-supabase)上找到一个使用SuperTokens、Supabase和Nexts.js的演示应用程序。
+
+## 步骤1：创建一个新的Supabase项目
+
+在你的[Supabase仪表板](https://app.supabase.com/)上，点击`新项目'。
+
+为你的Supabase项目输入一个`名称'。
+
+输入一个安全的 "数据库密码"。
+
+选择你的应用程序后台所在的同一个 "区域"。
+
+点击 `创建新项目`。
+
+![New Supabase project settings](/docs/img/guides/integrations/supertokens/supabase_dashboard_create.png)
+
+## 第2步：在Supabase中创建表
+
+在[Supabase仪表板](https://app.supabase.com/)的侧边栏菜单中，点击 `表编辑器`，然后点击 `新建表`。
+
+输入`users`作为`名称`字段。
+
+选择 `启用行级安全（RLS`。
+
+删除默认列
+
+创建两个新列。
+
+- `user_id`为`varchar`，作为主键
+- `email`为`varchar`。
+
+点击 `保存`来创建新表。
+
+![Users table](/docs/img/guides/integrations/supertokens/supabase_table_create.png)
+
+## 第三步：用SuperTokens设置你的Next.js应用程序。
+
+由于本指南的范围仅限于 SuperTokens 和 Supabase 之间的集成，您可以参考 SuperTokens 网站，查看 [如何用 SuperTokens 设置您的 Next.js 应用程序](https://supertokens.com/docs/thirdpartyemailpassword/nextjs/about)。
+
+一旦你完成了应用的设置，你将看到以下屏幕
+
+![SuperTokens Auth Screen](/docs/img/guides/integrations/supertokens/supertokens_thirdpartyemailpassword_auth_screen.png)
+
+## 第4步：创建一个Supabase JWT来访问Supabase
+
+在我们的 Nextjs 应用程序中，当用户注册时，我们希望在 Supabase 中存储用户的电子邮件。然后我们将从Supabase中检索该电子邮件，并在我们的前端显示它。
+
+要使用Supabase客户端来查询数据库，我们需要创建一个用Supabase应用程序的签名秘密签名的JWT。这个JWT还需要包含用户的userId，以便Supabase知道有一个经过认证的用户在发出请求。
+
+为了创建这个流程，我们需要修改 SuperTokens，以便在用户注册或登录时，创建一个用 Supabase 的签名秘密签名的 JWT，并附加到用户的会话中。将JWT附加到用户的会话上将使我们能够在前端和后端（会话后验证）检索Supabase JWT，使用它我们可以查询Supabase。
+
+我们希望在创建SuperTokens的会话时创建一个Supabase JWT。这可以通过在你的后端配置中覆盖`createNewSession`函数来实现。
+
+```ts
+// config/backendConfig.ts
+
+import ThirdPartyEmailPasswordNode from "supertokens-node/recipe/thirdpartyemailpassword";
+import SessionNode from "supertokens-node/recipe/session";
+import { TypeInput } from "supertokens-node/lib/build/types";
+import { appInfo } from "./appInfo";
+import jwt from "jsonwebtoken";
+
+let backendConfig = (): TypeInput => {
+    return {
+        framework: "express",
+        supertokens: {
+            connectionURI: "https://try.supertokens.com",
+        },
+        appInfo,
+        recipeList: [
+            ThirdPartyEmailPasswordNode.init({...}),
+            SessionNode.init({
+                override: {
+                    functions: (originalImplementation) => {
+                        return {
+                            ...originalImplementation,
+                            // We want to create a JWT which contains the users userId signed with Supabase's secret so
+                            // it can be used by Supabase to validate the user when retrieving user data from their service.
+                            // We store this token in the accessTokenPayload so it can be accessed on the frontend and on the backend.
+                            createNewSession: async function (input) {
+                                const payload = {
+                                    userId: input.userId,
+                                    exp: Math.floor(Date.now() / 1000) + 60 * 60,
+                                };
+
+                                const supabase_jwt_token = jwt.sign(payload, process.env.SUPABASE_SIGNING_SECRET);
+
+                                input.accessTokenPayload = {
+                                    ...input.accessTokenPayload,
+                                    supabase_token: supabase_jwt_token,
+                                };
+
+                                return await originalImplementation.createNewSession(input);
+                            },
+                        };
+                    },
+                },
+            }),
+        ],
+        isInServerlessEnv: true,
+    };
+};
+
+```
+
+如上所述，我们将使用`jsonwebtoken`库来创建一个用Supabase的签名秘密签名的JWT，其有效载荷包含用户的userId。
+
+我们将把这个令牌存储在`accessTokenPayload`中，这基本上允许我们在用户登录时在前端和后端访问`supabase_token`。
+
+## 第五步: 创建一个Supabase客户端
+
+创建一个名为`utils/supabase.ts`的新文件并添加以下内容。
+
+```ts
+// utils/supabase.ts
+
+import { createClient } from '@supabase/supabase-js'
+
+const getSupabase = (access_token) => {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_KEY
+  )
+
+  supabase.auth.session = () => ({
+    access_token,
+  })
+
+  return supabase
+}
+
+export { getSupabase }
+```
+
+这将是我们与Supabase对话的客户端。我们可以传递给它一个`access_token'，它将被附加到我们的请求中。这个`access_token`与我们之前创建的`supabase_token`相同。
+
+## 第6步：当用户注册时，将其插入Supabase中。
+
+在我们的示例应用程序中，有两种方法可以注册用户。电子邮件-密码和基于社会登录的认证。我们将需要覆盖这两个API，以便当用户注册时，他们的电子邮件映射到他们的userId被存储在Supabase中。
+
+```ts
+// config/backendConfig.ts
+
+import ThirdPartyEmailPasswordNode from "supertokens-node/recipe/thirdpartyemailpassword";
+import SessionNode from "supertokens-node/recipe/session";
+import { TypeInput } from "supertokens-node/lib/build/types";
+import { appInfo } from "./appInfo";
+import jwt from "jsonwebtoken";
+import { getSupabase } from "../utils/supabase";
+
+let backendConfig = (): TypeInput => {
+    return {
+        framework: "express",
+        supertokens: {
+            connectionURI: "https://try.supertokens.com",
+        },
+        appInfo,
+        recipeList: [
+            ThirdPartyEmailPasswordNode.init({
+                providers: [...],
+                override: {
+                    apis: (originalImplementation) => {
+                        return {
+                            ...originalImplementation,
+                            // the thirdPartySignInUpPost function handles sign up/in via Social login
+                            thirdPartySignInUpPOST: async function (input) {
+                                if (originalImplementation.thirdPartySignInUpPOST === undefined) {
+                                    throw Error("Should never come here");
+                                }
+
+                                // call the sign up/in api for social login
+                                let response = await originalImplementation.thirdPartySignInUpPOST(input);
+
+                                // check that there is no issue with sign up and that a new user is created
+                                if (response.status === "OK" && response.createdNewUser) {
+
+                                    // retrieve the accessTokenPayload from the user's session
+                                    const accessTokenPayload = response.session.getAccessTokenPayload();
+
+                                    // create a supabase client with the supabase_token from the accessTokenPayload
+                                    const supabase = getSupabase(accessTokenPayload.supabase_token);
+
+                                    // store the user's email mapped to their userId in Supabase
+                                    const { error } = await supabase
+                                        .from("users")
+                                        .insert({ email: response.user.email, user_id: response.user.id });
+
+                                    if (error !== null) {
+
+                                        throw error;
+                                    }
+                                }
+
+                                return response;
+                            },
+                            // the emailPasswordSignUpPOST function handles sign up via Email-Password
+                            emailPasswordSignUpPOST: async function (input) {
+                                if (originalImplementation.emailPasswordSignUpPOST === undefined) {
+                                    throw Error("Should never come here");
+                                }
+
+                                let response = await originalImplementation.emailPasswordSignUpPOST(input);
+
+                                if (response.status === "OK") {
+
+                                    // retrieve the accessTokenPayload from the user's session
+                                    const accessTokenPayload = response.session.getAccessTokenPayload();
+
+                                    // create a supabase client with the supabase_token from the accessTokenPayload
+                                    const supabase = getSupabase(accessTokenPayload.supabase_token);
+
+                                    // store the user's email mapped to their userId in Supabase
+                                    const { error } = await supabase
+                                        .from("users")
+                                        .insert({ email: response.user.email, user_id: response.user.id });
+
+                                    if (error !== null) {
+
+                                        throw error;
+                                    }
+                                }
+
+                                return response;
+                            },
+                        };
+                    },
+                },
+            }),
+            SessionNode.init({...}),
+        ],
+        isInServerlessEnv: true,
+    };
+};
+
+```
+
+如上所述，我们将覆盖`emailPasswordSignUpPOST`和`thirdPartySignInUpPOST`API，这样，如果一个用户注册，我们从用户的accessTokenPayload中检索Supabase JWT（我们在`createNewSession'函数中创建），并向Supabase发送请求，插入email-userid的映射。
+
+## 第七步：在前台检索用户的电子邮件
+
+现在我们的后端已经设置好了，我们可以修改我们的前端来从Supabase中检索用户的电子邮件。
+
+```tsx
+// pages/index.tsx
+
+import React, { useState, useEffect } from 'react'
+import Head from 'next/head'
+import styles from '../styles/Home.module.css'
+import ThirdPartyEmailPassword, {
+  ThirdPartyEmailPasswordAuth,
+} from 'supertokens-auth-react/recipe/thirdpartyemailpassword'
+import dynamic from 'next/dynamic'
+import { useSessionContext } from 'supertokens-auth-react/recipe/session'
+import { getSupabase } from '../utils/supabase'
+
+export default function Home() {
+  return (
+    // We will wrap the ProtectedPage component with ThirdPartyEmailPasswordAuth so only an
+    // authenticated user can access it. This will also allow us to access the users session information
+    // within the component.
+    <ThirdPartyEmailPasswordAuth>
+      <ProtectedPage />
+    </ThirdPartyEmailPasswordAuth>
+  )
+}
+
+function ProtectedPage() {
+  // retrieve the authenticated user's accessTokenPayload and userId from the sessionContext
+  const { accessTokenPayload, userId } = useSessionContext()
+
+  if (sessionContext.loading === true) {
+    return null
+  }
+
+  const [userEmail, setEmail] = useState('')
+  useEffect(() => {
+    async function getUserEmail() {
+      // retrieve the supabase client who's JWT contains users userId, this will be
+      // used by supabase to check that the user can only access table entries which contain their own userId
+      const supabase = getSupabase(accessTokenPayload.supabase_token)
+
+      // retrieve the user's name from the users table whose email matches the email in the JWT
+      const { data } = await supabase.from('users').select('email').eq('user_id', userId)
+
+      if (data.length > 0) {
+        setEmail(data[0].email)
+      }
+    }
+    getUserEmail()
+  }, [])
+
+  return (
+    <div className={styles.container}>
+      <Head>
+        <title>SuperTokens 💫</title>
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
+
+      <main className={styles.main}>
+        <p className={styles.description}>
+          You are authenticated with SuperTokens! (UserId: {userId})
+          <br />
+          Your email retrieved from Supabase: {userEmail}
+        </p>
+      </main>
+    </div>
+  )
+}
+```
+
+如上所述，我们将使用SuperTokens的`useSessionContext`钩子来检索已认证用户的`userId`和`accessTokenPayload`。使用React的`useEffect`钩子，我们可以使用Supabase客户端，使用从用户的`accessTokenPayload`中获取的JWT和他们的`userId`，从Supabase中获取用户的电子邮件。
+
+## 第8步: 创建策略来执行选择和插入请求的行级安全
+
+为了执行 `Users`表的行级安全，我们需要为选择和插入请求创建策略。
+
+这些策略将从JWT中获取用户身份，并检查它是否与Supabase表中的用户身份相符。
+
+要做到这一点，我们将需要一个PostgreSQL函数来从JWT中提取userId。
+
+JWT中的有效载荷将有以下结构。
+
+```
+// JWT payload
+{
+    userId,
+    exp
+}
+```
+
+要创建PostgreSQL功能，让我们回到Supabase仪表板，从侧边栏菜单中选择`SQL`，然后点击`新查询`。这将创建一个新的查询，称为 `新sql片段`，这将允许我们对Postgres数据库运行任何SQL。
+
+写下以下内容并点击`运行`。
+
+```sql
+create or replace function auth.user_id() returns text as $$
+  select nullif(current_setting('request.jwt.claims', true)::json->>'userId', '')::text;
+$$ language sql stable;
+```
+
+这将创建一个名为`auth.user_id()`的函数，它将检查我们JWT有效载荷中的`userId`字段。
+
+### SELECT查询策略
+
+我们的第一个策略将检查用户是否是电子邮件的所有者。
+
+从Supabase侧边栏菜单中选择`Authentication`，点击`Policies`，然后在`Users`表中选择`New Policy`。
+
+![Create new policy](/docs/img/guides/integrations/supertokens/create_policy.png)
+
+在模式中，选择 `从头创建一个政策`，并添加以下内容。
+
+![Policy settings for SELECT](/docs/img/guides/integrations/supertokens/policy_config_select.png)
+
+这个策略是调用我们刚刚创建的PostgreSQL函数来获取当前登录用户的ID`auth.user_id()`，并检查这是否与当前`email`的`user_id`列匹配。如果匹配，那么它将允许用户选择，否则将继续拒绝。
+
+点击 `Review`，然后点击 "保存策略"。
+
+### INSERT查询策略
+
+我们的第二个策略将检查正在插入的`user_id`是否与JWT中的`userId`相同。
+
+创建另一个策略并添加以下内容。
+
+![Policy settings for INSERT](/docs/img/guides/integrations/supertokens/policy_config_insert.png)
+
+与之前的策略类似，我们正在调用我们创建的PostgreSQL函数来获取当前登录用户的ID`auth.user_id()`并检查它是否与我们试图插入的行的`user_id`列相匹配。如果匹配，那么它将允许用户插入该行，否则它将继续拒绝。
+
+点击 `Review`，然后点击 "保存策略"。
+
+## 第九步：测试你的变化
+
+你现在可以注册了，你应该看到以下屏幕。
+
+![SuperTokens App Authenticated](/docs/img/guides/integrations/supertokens/supabase_app_authenticated_screen.png)
+
+如果你导航到你的表，你应该看到一个新的行，上面有用户的`user_id`和`email`。
+
+![Supabase Users table](/docs/img/guides/integrations/supertokens/table_with_user.png)
+
+## 资源
+
+- [SuperTokens](https://supertokens.com/) 官方网站。
+- [SuperTokens社区](https://supertokens.com/discord)。
+- [SuperTokens文档](https://supertokens.com/docs/guides)。
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

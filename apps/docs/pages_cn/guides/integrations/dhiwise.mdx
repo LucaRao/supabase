@@ -1,0 +1,203 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'dhiwise',
+  title: 'DhiWise',
+  description:
+    '开始使用 Supabase 和 DhiWise。将您的 Figma 设计转换为 Flutter 应用程序，存储数据并验证您的用户。',
+}
+
+本指南介绍了如何将Supabase后端快速连接到DhiWise Flutter应用程序。
+
+[DhiWise](https://www.dhiwise.com/)是一个将Figma设计转换为React和Flutter应用程序的开发者工具。它可以让您快速将数据库和API集成到您的React和Flutter应用程序中。
+
+如果您还没有DhiWise账户，请创建一个[这里](https://app.dhiwise.com)。
+
+DhiWise支持简单的Supabase集成，只需五个步骤。
+
+让我们开始吧!
+
+## 第1步：登录到Supabase
+
+进入[Supabase](https://supabase.com/)，点击 `Sign In`，通过**GitHub认证创建一个新账户。如果你已经有一个账户，你将会被登录。
+
+## 第二步：在Supabase中创建一个新项目
+
+在仪表板上点击 `新项目`，选择一个组织。如果你没有一个组织，请使用`+新组织`创建一个组织。
+
+- 给你的Supabase项目起一个`名称`。
+- 输入一个安全的 `数据库密码`。
+- 选择你的应用程序的后端所在的 `区域`。
+- 点击 `创建新项目`。
+
+![New Project](/docs/img/guides/integrations/dhiwise/newProj.png)
+
+## 第3步：找到API密钥和URL
+
+一旦你的项目被创建，你可以访问API密钥和URL字符串，或者如果你已经有一个账户，去你的`组织->应用程序->设置->API`。
+
+![auth keys](/docs/img/guides/integrations/dhiwise/authKeys.png)
+
+## 第4步：整合
+
+您可以通过两种方式将 Supabase 集成到您的 DhiWise Flutter 应用程序中。
+
+### 认证
+
+您可以在您的组件上集成`Supabase Email/Password SignUp`或`Supabase Email/Password SignIn`。
+
+- 打开您的flutter应用程序的屏幕
+- 转到您想添加认证的组件上
+- 在`onClick`方法上 - 选择`authentication`。
+- 从列表中，如果您想要登录 - 选择`用电子邮件/密码登录`；否则，从Supabase Auth部分选择`用电子邮件/密码登录`。
+
+![Auth](/docs/img/guides/integrations/dhiwise/auth.gif)
+
+Supabase认证将被添加到选定的组件中。
+
+在下载了应用程序的源代码后。
+
+1. 在**_lib/core/utils/initial_bindings_**文件中添加Supabase URL和Supabase公钥。
+2. 2. 有关其他细节，请参阅***https://supabase.com/docs/guides/with-flutter***。
+
+### 使用数据工作
+
+当你第一次在你的DhiWise Flutter应用程序中集成Supabase时，你会被要求添加[Supabase的认证密钥和URL](##步骤3-找到api-key和url)。当您添加它们时，您的 Supabase 项目中所有可用的表都将在 DhiWise 中同步。您可以在您的Flutter屏幕上为DhiWise中的某个表整合选择和创建查询。
+
+###选择记录
+
+![Create](/docs/img/guides/integrations/dhiwise/select.png)
+
+#### **Step 1:**
+
+从屏幕列表中选择你要集成Supabase的屏幕。
+
+#### **Step 2:**
+
+接下来，进入你要添加集成的视图，从 `onClick`属性的建议框中，选择 `数据库集成`，这将带你进入集成屏幕。在那里你将被要求 `输入函数名称`。输入你的函数名称，然后点击 `submit`。
+
+#### **Step 3:**
+
+提交功能名称后，您将被要求选择一种Supabase集成类型。要从Supabase检索数据，请选择`select`。
+
+#### **Step 4:**
+
+接下来，选择你想从列出的表中获取记录的表。
+
+#### **Step 5:**
+
+选择整合的类型
+
+| Type         | Description                                       |
+| ------------ | ------------------------------------------------- |
+| **Single**   | 用于从数据库中获取一条记录。                        |
+| **Multiple** | 用于从数据库中获取多条记录。                        |
+
+<Admonition type="info">
+
+对于多个类型，你需要设置 `数据限制`、`按顺序`和 `顺序`。
+
+</Admonition>
+
+#### **Step 6:**
+
+你将被转到API集成界面，在那里你可以设置请求和响应。
+
+对于请求绑定，支持以下类型。另外，在继续前进之前，请选择操作者进行比较。
+
+| Type                    | Description                                                |
+| ----------------------- | ---------------------------------------------------------- |
+| **View**                | 从你的屏幕上选择任何组件。                                   |
+| **Constant**            | 选择一个你在你的应用程序中创建的常量。                        |
+| **Get from preference** | 选择你想从偏好中获取的键。                                 |
+| **Navigation argument** | 选择已经从一个屏幕传递到另一个屏幕的数据。                    |
+
+对于响应绑定，支持以下类型。
+
+| Type                   | Description                           |
+| ---------------------- | ------------------------------------- |
+| **View**               | 从屏幕上选择任何组件。                  |
+| **Save to preference** | 将数据存储到偏好。                      |
+
+#### **Select 7:**
+
+`Handle action` - 选择您希望在Supabase调用被成功接受或因错误而被拒绝后采取的行动。
+
+成功时和出错时的可用操作是。
+
+1. [显示警报](https://docs.dhiwise.com/docs/flutter/show-alert)
+2. [导航](https://docs.dhiwise.com/docs/flutter/navigation)
+
+#### **Step 8:**
+
+最后，你已经将Supabase添加到你的应用程序中，以便在你的屏幕上获取记录!
+
+<Admonition type="tip" label="Example">
+
+假设你想从Supabase获取记录并在屏幕上填充项目列表。你可以像上面讨论的那样集成Supabase并将响应与你的列表视图绑定。
+
+</Admonition>
+
+<h3> Create records </h3>
+
+#### **Step 1:**
+
+从屏幕列表中选择你想集成Supabase的屏幕。
+
+#### **Step 2:**
+
+接下来，切换到你要添加集成的组件，在 `onClick`属性上，选择 `数据库集成`，这将带你到它的集成屏幕，在那里你将被要求**输入函数名称**，它将被用于生成代码。输入它的名字，然后点击`submit`。
+
+#### **Step 3:**
+
+提交函数名称后，您将被要求选择一种Supabase集成类型。例如，要在Supabase中创建一条记录，选择 `Create`。
+
+#### **Step 4:**
+
+接下来，从列出的表中选择你想创建记录的表。
+
+#### **Step 5:**
+
+如果你想创建一条记录，选择**选择**。否则，选择**多条**。
+
+#### **Step 6:**
+
+现在，你将被重定向到API集成屏幕，在那里你可以设置请求和响应。
+
+对于请求绑定，支持以下类型。
+
+| Type                    | Description                                                |
+| ----------------------- | ---------------------------------------------------------- |
+| **View**                | 从屏幕上选择任何组件                                        |
+| **Constant**            | 选择一个你在你的应用程序中创建的常量。                       |
+| **Get from preference** | 选择你想从偏好中获取的键。                                  |
+| **Navigation argument** | 选择已经从一个屏幕传递到另一个屏幕的数据。                   |
+
+对于响应绑定，支持以下类型。
+
+| Type                   | Description                          |
+| ---------------------- | ------------------------------------ |
+| **View**               | 从屏幕上选择任何组件                  |
+| **Save to preference** | 将数据存储到偏好的地方。              |
+
+#### **Select 7:**
+
+`Handle action` - 选择您希望在Supabase调用被成功接受或因错误而被拒绝后采取的行动。
+
+成功时和出错时的可用操作是。
+
+1. [显示警报](https://docs.dhiwise.com/docs/flutter/show-alert)
+2. [导航](https://docs.dhiwise.com/docs/flutter/navigation)
+
+#### **Step 9:**
+
+最后，你已经将Supabase添加到你的应用程序中，从你的屏幕数据中创建记录!
+
+## 资源
+
+- [DhiWise 官方网站](https://dhiwise.com)
+- [DhiWise 文档](https://docs.dhiwise.com)
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page

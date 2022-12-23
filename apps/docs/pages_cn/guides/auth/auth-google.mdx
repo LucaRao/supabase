@@ -1,0 +1,120 @@
+import Layout from '~/layouts/DefaultGuideLayout'
+
+export const meta = {
+  id: 'auth-google',
+  title: '使用谷歌登录',
+  description: '在你的Supabase项目中加入谷歌OAuth',
+}
+
+要为你的项目启用Google Auth，你需要设置一个Google OAuth应用程序，并将应用程序的凭证添加到你的Supabase仪表板。
+
+## 概述
+
+为你的应用程序设置谷歌登录包括3个部分。
+
+- 在[Google Cloud Platform Console](https://console.cloud.google.com/home/dashboard)上创建和配置一个Google项目
+- 将你的谷歌OAuth密钥添加到你的[Supabase项目](https://app.supabase.com)
+- 将登录代码添加到你的[Supabase JS客户端应用程序](https://github.com/supabase/supabase-js)
+
+## 访问你的谷歌云平台账户
+
+- 转到[cloud.google.com](https://cloud.google.com)。
+- 点击右上方的 `Sign in`来登录。
+
+![Google Developer Portal.](/docs/img/guides/auth-google/google-portal.png)
+
+## 创建一个谷歌云平台项目
+
+- 点击左上角的 `选择一个项目`。
+  - (或者，如果当前选择了一个项目，点击左上角的当前项目名称。)
+- 点击右上方的 `新项目`。
+- 填写你的应用程序信息，然后点击 `创建`。
+  - 这可能需要几分钟时间。
+- 这将使你进入新项目的仪表板。
+
+## 为你的项目创建OAuth密钥
+
+在你项目的仪表盘屏幕上。
+
+- 在顶部标有 `搜索产品和资源`的搜索栏中输入 `OAuth`。
+- 在结果列表中点击 `OAuth同意界面`。
+- 在 `OAuth同意屏幕`页面选择 `外部`。
+- 点击 `创建`。
+
+## 编辑你的应用程序信息
+
+- 在 `编辑应用程序注册`页面，填写您的应用程序信息。
+- 点击底部的 `保存并继续`。
+
+## 找到你的回调URL
+
+下一步需要一个回调URL，它看起来像这样。
+
+`https://<project-ref>.supabase.co/auth/v1/callback`
+
+- 进入你的[Supabase项目仪表板](https://app.supabase.com)。
+- 点击左侧边栏底部的 `设置`图标。
+- 点击列表中的 `API`。
+- 在配置/URL下，你会发现你的API URL，你可以点击`复制`将其复制到剪贴板。
+- 现在只要在后面加上`/auth/v1/callback`就可以得到完整的`OAuth Redirect URI`。
+
+<video width="99%" muted playsInline controls="true">
+  <source src="/docs/videos/api/api-url-and-key.mp4" type="video/mp4" muted playsInline />
+</video>
+
+## 创建你的谷歌凭证
+
+- 点击左边的 `证书`，进入谷歌云平台控制台的 `证书`页面。
+- 点击顶部的 `创建凭证`，然后选择 `OAuth客户端ID`。
+- 在 `创建OAuth客户端ID`页面，选择你的应用程序类型。如果你不确定，选择 `网络应用`。
+- 填入你的应用程序名称。
+- 在底部，在 `授权重定向URI`下点击 `添加URI`。
+- 在底部的 `授权重定向URI`下输入你的回调URI。
+- 在 `有效的OAuth重定向URI`框中输入你的回调URI。
+- 点击右下角的 `保存更改`。
+- 点击 `创建`。
+
+复制你的新OAuth凭证
+
+- 会出现一个名为 `创建OAuth客户端`的框。
+- 复制并保存 `你的客户ID`和 `你的客户秘密`下的值。
+
+## 将你的谷歌凭证输入你的Supabase项目
+
+- 转到你的[Supabase项目仪表板](https://app.supabase.com)
+- 在左边的侧边栏，点击 `认证`图标(靠近顶部)
+- 从列表中点击 `设置`，进入 `认证设置`页面
+- 在 `网站URL`下输入你的应用程序的最终（托管）URL（这很重要）。
+- 在 `外部OAuth供应商`下，将 `Google启用`设为 `ON`
+- 输入你在上一步保存的 `Google客户ID`和 `Google客户秘密`。
+- 点击 `保存`。
+
+## 将登录代码添加到你的客户端应用程序
+
+当你的用户登录时，调用[signInWithOAuth()](/docs/reference/javascript/auth-signinwithoauth)，将`google`作为`供应商`。
+
+```js
+async function signInWithGoogle() {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+  })
+}
+```
+
+当你的用户签出时，调用[signOut()](/docs/reference/javascript/auth-signout)，将他们从浏览器会话和任何对象从localStorage中移除。
+
+```js
+async function signout() {
+  const { error } = await supabase.auth.signOut()
+}
+```
+
+## 资源
+
+- [Supabase帐户 - 免费层](https://supabase.com)
+- [Supabase JS客户端](https://github.com/supabase/supabase-js)
+- [谷歌云平台控制台](https://console.cloud.google.com/home/dashboard)
+
+export const Page = ({ children }) => <Layout meta={meta} children={children} />
+
+export default Page
